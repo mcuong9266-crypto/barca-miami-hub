@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Barça & Miami Hub</title>
+  <meta name="description" content="Theo dõi lịch thi đấu, phân tích và dự đoán trận đấu của Barcelona và Inter Miami">
+  <meta name="theme-color" content="#0b0f1d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Barça·Miami">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="bg"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark">⚽</div>
+      <div><div class="brand-name">Barça · Miami</div><div class="brand-sub" id="updated">Đang tải…</div></div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="btn-refresh" aria-label="Làm mới">⟳</button>
+      <button class="icon-btn" id="btn-settings" aria-label="Cài đặt">⚙︎</button>
+    </div>
+  </header>
+
+  <nav class="team-switch" id="team-switch">
+    <button data-team="barca"><img src="https://a.espncdn.com/i/teamlogos/soccer/500/83.png" alt="">Barça</button>
+    <button data-team="miami"><img src="https://a.espncdn.com/i/teamlogos/soccer/500/20232.png" alt="">Inter Miami</button>
+    <span class="pill-bg"></span>
+  </nav>
+
+  <main id="view" class="view"></main>
+
+  <nav class="tabbar" id="tabbar">
+    <button data-tab="home"><span>🏠</span>Tổng quan</button>
+    <button data-tab="schedule"><span>🗓️</span>Lịch</button>
+    <button data-tab="match"><span>📊</span>Phân tích</button>
+    <button data-tab="predict"><span>🔮</span>Dự đoán</button>
+    <button data-tab="trends"><span>📈</span>Xu hướng</button>
+  </nav>
+
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet-card">
+      <div class="sheet-head"><h3>Cài đặt</h3><button class="icon-btn" id="sheet-close">✕</button></div>
+      <div id="sheet-body"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script src="core.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
