@@ -7,6 +7,12 @@ const TEAMS = {
            c1: '#f7b5cd', c2: '#2b2b2b', acc: '#f7b5cd', emoji: '🩷🖤' }
 };
 const KV_CACHE = 'bmh-kv-v1';
+const LEAGUE_VI = {
+  'esp.1': 'La Liga', 'usa.1': 'Giải Nhà nghề Mỹ', 'uefa.champions': 'Champions League', 'esp.copa_del_rey': 'Cúp Nhà vua Tây Ban Nha',
+  'esp.super_cup': 'Siêu cúp Tây Ban Nha', 'club.friendly': 'Giao hữu', 'concacaf.champions': 'Cúp các câu lạc bộ CONCACAF',
+  'usa.open': 'Cúp quốc gia Mỹ', 'concacaf.leagues.cup': 'Leagues Cup', 'fifa.cwc': 'FIFA Club World Cup', 'uefa.super_cup': 'Siêu cúp châu Âu'
+};
+function leagueName(l) { if (!l) return ''; return LEAGUE_VI[l.slug] || l.name || l.shortName || l.abbreviation || ''; }
 
 /* ---------- tiny key/value store on Cache API (works in page + SW) ---------- */
 async function kvGet(k) {
@@ -52,7 +58,7 @@ function parseEvent(e, teamId) {
   const gf = completed ? me.score : null, ga = completed ? opp.score : null;
   return {
     id: String(e.id), date: e.date, teamId: String(teamId),
-    league: (e.league && (e.league.shortName || e.league.abbreviation || e.league.name)) || '',
+    league: leagueName(e.league),
     leagueSlug: (e.league && e.league.slug) || '',
     venue: (c.venue && c.venue.fullName) || '', state: st.state, completed, status: st.name,
     detail: st.shortDetail || st.detail || '', clock: c.status.displayClock || '',
@@ -123,12 +129,12 @@ function parseSummary(d) {
     id: String(comp.id || (d.header && d.header.id) || ''), date: comp.date, completed: !!st.completed, state: st.state, detail: st.shortDetail || st.detail || '',
     teams, stats, events, odds,
     venue: (d.gameInfo && d.gameInfo.venue && d.gameInfo.venue.fullName) || '', attendance: (d.gameInfo && d.gameInfo.attendance) || null,
-    league: (d.header && d.header.league && (d.header.league.shortName || d.header.league.name)) || ''
+    league: leagueName(d.header && d.header.league)
   };
 }
 
 async function loadSummary(eventId, force) {
-  const k = 'sum:' + eventId;
+  const k = 'sum2:' + eventId;
   if (!force) { const c = await kvGet(k); if (c) return c; }
   const d = await fetchJSON(`${API}/all/summary?event=${eventId}`, { store: false });
   const s = parseSummary(d);
@@ -187,9 +193,9 @@ function analyzeMatch(sum, teamId, avg) {
   if (a.totalShots != null) ins.push({ i: '👟', t: `Tung ra ${a.totalShots} cú sút (${a.shotsOnTarget ?? 0} trúng đích) so với ${b.totalShots ?? 0} (${b.shotsOnTarget ?? 0}) của ${on}.` });
   if (a.totalShots) {
     const diff = gf - xg;
-    if (diff >= 1.2) ins.push({ i: '🎯', t: `Dứt điểm cực kỳ sắc bén: ${gf} bàn từ xG ước tính ${xg.toFixed(1)} (+${diff.toFixed(1)}).` });
-    else if (diff <= -1.2) ins.push({ i: '😤', t: `Phung phí cơ hội: chỉ ${gf} bàn dù xG ước tính ${xg.toFixed(1)}.` });
-    if (xga - ga >= 1) ins.push({ i: '🧤', t: `Thủ môn/hàng thủ đứng vững: chỉ thủng lưới ${ga} dù đối thủ tạo xG ~${xga.toFixed(1)}.` });
+    if (diff >= 1.2) ins.push({ i: '🎯', t: `Dứt điểm cực kỳ sắc bén: ${gf} bàn trong khi số bàn thắng kỳ vọng chỉ là ${xg.toFixed(1)} (+${diff.toFixed(1)}).` });
+    else if (diff <= -1.2) ins.push({ i: '😤', t: `Phung phí cơ hội: chỉ ${gf} bàn dù số bàn thắng kỳ vọng là ${xg.toFixed(1)}.` });
+    if (xga - ga >= 1) ins.push({ i: '🧤', t: `Thủ môn/hàng thủ đứng vững: chỉ thủng lưới ${ga} dù đối thủ tạo ra cơ hội tương đương khoảng ${xga.toFixed(1)} bàn.` });
   }
   const pp = passP(a);
   if (pp != null && a.totalPasses) {
@@ -210,7 +216,7 @@ function analyzeMatch(sum, teamId, avg) {
     }
     if (poss != null && avg.poss) {
       const d = poss - avg.poss;
-      if (Math.abs(d) >= 6) ins.push({ i: '🔄', t: `Kiểm soát bóng ${d > 0 ? 'nhiều' : 'ít'} hơn thường lệ ${Math.abs(d).toFixed(0)}% (TB ${avg.poss.toFixed(0)}%).` });
+      if (Math.abs(d) >= 6) ins.push({ i: '🔄', t: `Kiểm soát bóng ${d > 0 ? 'nhiều' : 'ít'} hơn thường lệ ${Math.abs(d).toFixed(0)}% (trung bình ${avg.poss.toFixed(0)}%).` });
     }
   }
 
@@ -235,7 +241,7 @@ function matchRecap(sum, a) {
   out.push({ i: '📝', t: `${me.name} ${verb} ${opp.name} ${a.gf}-${a.ga}${sum.league ? ' (' + sum.league + ')' : ''}${goals.length ? `, hiệp 1 ${ht[0]}-${ht[1]}` : ''}.` });
   if (goals.length) {
     let s = [0, 0];
-    const line = goals.map(g => { s[g.teamId === me.id ? 0 : 1]++; const tag = /own/i.test(g.type) ? ' (phản lưới)' : /penalty/i.test(g.type) ? ' (pen)' : ''; return `${g.min} ${g.player || '?'}${tag} ${s[0]}-${s[1]}`; });
+    const line = goals.map(g => { s[g.teamId === me.id ? 0 : 1]++; const tag = /own/i.test(g.type) ? ' (phản lưới)' : /penalty/i.test(g.type) ? ' (phạt đền)' : ''; return `${g.min} ${g.player || '?'}${tag} ${s[0]}-${s[1]}`; });
     out.push({ i: '⚽', t: line.join(' · ') });
   }
   // turning point
@@ -244,8 +250,8 @@ function matchRecap(sum, a) {
   if (decisive && a.result !== 'D' && decisive === goals[0]) out.push({ i: '🔑', t: `Bàn mở tỉ số của ${decisive.player} (${decisive.min}) định đoạt thế trận — ${decisive.teamId === me.id ? me.name : opp.name} dẫn trước đến hết trận.` });
   else if (decisive && a.result !== 'D') out.push({ i: '🔑', t: `Bước ngoặt: bàn của ${decisive.player} phút ${decisive.min} đưa ${decisive.teamId === me.id ? me.name : opp.name} vượt lên và giữ đến hết trận.` });
   const reds = sum.events.filter(e => /red/.test(e.type));
-  if (reds.length) out.push({ i: '🟥', t: reds.map(r => `${r.player} (${r.teamId === me.id ? me.abbr : opp.abbr}) nhận thẻ đỏ phút ${r.min}`).join('; ') + '.' });
-  if (a.a.totalShots != null) out.push({ i: '📊', t: `Kiểm soát ${a.poss != null ? a.poss.toFixed(0) + '%' : '-'} · Sút ${a.a.totalShots}(${a.a.shotsOnTarget || 0}) vs ${a.b.totalShots ?? 0}(${a.b.shotsOnTarget || 0}) · xG ~${a.xg.toFixed(1)}-${a.xga.toFixed(1)}.` });
+  if (reds.length) out.push({ i: '🟥', t: reds.map(r => `${r.player} (${r.teamId === me.id ? me.name : opp.name}) nhận thẻ đỏ phút ${r.min}`).join('; ') + '.' });
+  if (a.a.totalShots != null) out.push({ i: '📊', t: `Kiểm soát bóng ${a.poss != null ? a.poss.toFixed(0) + '%' : 'không rõ'}; ${a.a.totalShots} cú sút (${a.a.shotsOnTarget || 0} trúng đích) so với ${a.b.totalShots ?? 0} (${a.b.shotsOnTarget || 0}); bàn thắng kỳ vọng ${a.xg.toFixed(1)} so với ${a.xga.toFixed(1)}.` });
   return out.slice(0, 5);
 }
 function share(x, y) { x = x || 0; y = y || 0; return x + y === 0 ? 50 : x / (x + y) * 100; }
@@ -256,7 +262,7 @@ async function loadTrends(sched, n = 10) {
   const sums = await pool(recent, 4, m => loadSummary(m.id));
   const rows = [];
   recent.forEach((m, i) => {
-    const s = sums[i]; const r = { id: m.id, date: m.date, opp: m.opp.abbr || m.opp.short, oppName: m.opp.name, gf: m.gf, ga: m.ga, result: m.result, home: m.isHome, league: m.league };
+    const s = sums[i]; const r = { id: m.id, date: m.date, opp: m.opp.short || m.opp.name, oppName: m.opp.name, gf: m.gf, ga: m.ga, result: m.result, home: m.isHome, league: m.league };
     if (s) {
       const a = s.stats[m.teamId] || {}, oppId = Object.keys(s.stats).find(k => k !== m.teamId), b = s.stats[oppId] || {};
       Object.assign(r, { poss: a.possessionPct ?? null, shots: a.totalShots ?? null, sot: a.shotsOnTarget ?? null, oppShots: b.totalShots ?? null, oppSot: b.shotsOnTarget ?? null,
@@ -295,6 +301,22 @@ function form(results, n = 10) {
 function poissonP(k, l) { let p = Math.exp(-l); for (let i = 1; i <= k; i++) p *= l / i; return p; }
 function mlToProb(ml) { if (ml == null || isNaN(ml)) return null; return ml < 0 ? -ml / (-ml + 100) : 100 / (ml + 100); }
 
+function scoreGrid(lMe, lOp) {
+  const N = 9, M = []; let D0 = 0;
+  for (let i = 0; i < N; i++) { M[i] = []; for (let j = 0; j < N; j++) { M[i][j] = poissonP(i, lMe) * poissonP(j, lOp); if (i === j) D0 += M[i][j]; } }
+  // Dixon-Coles style: real football has a few more draws than pure Poisson — move that mass onto the draw cells
+  const bump = Math.min(0.04, 0.06 * Math.exp(-(lMe + lOp) / 2));
+  const kd = (D0 + bump) / D0, ko = (1 - D0 - bump) / (1 - D0);
+  let W = 0, D = 0, L = 0, o15 = 0, o25 = 0, o35 = 0, btts = 0, csMe = 0, csOp = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const p = M[i][j] *= (i === j ? kd : ko);
+    if (i > j) W += p; else if (i === j) D += p; else L += p;
+    if (i + j > 1) o15 += p; if (i + j > 2) o25 += p; if (i + j > 3) o35 += p;
+    if (i > 0 && j > 0) btts += p; if (j === 0) csMe += p; if (i === 0) csOp += p;
+  }
+  return { M, W, D, L, o15, o25, o35, btts, csMe, csOp };
+}
+
 function predict(fMe, fOpp, isHome, odds, meIsHomeInOdds) {
   const base = 1.35;
   const shrink = (v, n) => { const k = Math.min(1, n / 8); return k * v + (1 - k) * base; };
@@ -303,30 +325,41 @@ function predict(fMe, fOpp, isHome, odds, meIsHomeInOdds) {
   const formAdj = (fMe.ppg - fOpp.ppg) * 0.04;
   let lMe = meGf * opGa / base * ha * (1 + formAdj), lOp = opGf * meGa / base * hb * (1 - formAdj);
   lMe = Math.min(4.5, Math.max(0.2, lMe)); lOp = Math.min(4.5, Math.max(0.15, lOp));
-  const N = 9, M = []; let W = 0, D = 0, L = 0, o15 = 0, o25 = 0, o35 = 0, btts = 0, csMe = 0, csOp = 0;
-  for (let i = 0; i < N; i++) { M[i] = []; for (let j = 0; j < N; j++) {
-    const p = poissonP(i, lMe) * poissonP(j, lOp); M[i][j] = p;
-    if (i > j) W += p; else if (i === j) D += p; else L += p;
-    if (i + j > 1) o15 += p; if (i + j > 2) o25 += p; if (i + j > 3) o35 += p;
-    if (i > 0 && j > 0) btts += p; if (j === 0) csMe += p; if (i === 0) csOp += p;
-  } }
-  // Dixon-Coles style draw bump for low-scoring games
-  const bump = Math.min(0.04, 0.06 * Math.exp(-(lMe + lOp) / 2));
-  W -= bump * W / (W + L); L -= bump * L / (W + L); D += bump;
-  const model = { W, D, L };
+  const mg = scoreGrid(lMe, lOp);
+  const model = { W: mg.W, D: mg.D, L: mg.L, lMe, lOp };
   let market = null;
   if (odds && odds.home != null && odds.away != null) {
     const ph = mlToProb(odds.home), pa = mlToProb(odds.away), pd = mlToProb(odds.draw) || 0.25;
     const s = ph + pa + pd;
     market = meIsHomeInOdds ? { W: ph / s, D: pd / s, L: pa / s } : { W: pa / s, D: pd / s, L: ph / s };
   }
-  const fin = market ? { W: 0.55 * W + 0.45 * market.W, D: 0.55 * D + 0.45 * market.D, L: 0.55 * L + 0.45 * market.L } : model;
+  // One unified forecast: re-balance the expected goals so that the score grid itself
+  // reproduces the blended (55% model + 45% bookmaker) win/loss balance. Everything shown
+  // — probabilities, expected goals, scorelines, goal markets — then comes from this one grid.
+  if (market) {
+    const target = 0.55 * (model.W - model.L) + 0.45 * (market.W - market.L);
+    const total = lMe + lOp;
+    let lo = 0.03, hi = 0.97;
+    for (let k = 0; k < 40; k++) { const r = (lo + hi) / 2, g = scoreGrid(total * r, total * (1 - r)); if (g.W - g.L < target) lo = r; else hi = r; }
+    const r = (lo + hi) / 2; lMe = total * r; lOp = total * (1 - r);
+  }
+  const g = market ? scoreGrid(lMe, lOp) : mg;
+  const fin = { W: g.W, D: g.D, L: g.L };
   const scores = [];
-  for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) scores.push({ s: `${i}-${j}`, i, j, p: M[i][j] });
+  for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) scores.push({ s: `${i}-${j}`, i, j, p: g.M[i][j] });
   scores.sort((a, b) => b.p - a.p);
+  // the headline pick: most likely outcome, then the most likely score inside that outcome
+  const outcome = fin.W >= fin.D && fin.W >= fin.L ? 'W' : fin.L >= fin.D ? 'L' : 'D';
+  const pick = scores.find(x => outcome === 'W' ? x.i > x.j : outcome === 'L' ? x.i < x.j : x.i === x.j);
   const agree = market ? 1 - (Math.abs(model.W - market.W) + Math.abs(model.L - market.L)) / 2 : 0.7;
   const conf = Math.round(Math.min(95, (Math.min(fMe.n, fOpp.n) / 10) * 45 + agree * 35 + Math.abs(fin.W - fin.L) * 25));
-  return { lMe, lOp, M, model, market, fin, o15, o25, o35, btts, csMe, csOp, scores: scores.slice(0, 8), conf };
+  return { lMe, lOp, M: g.M, model, market, fin, outcome, pick, o15: g.o15, o25: g.o25, o35: g.o35, btts: g.btts, csMe: g.csMe, csOp: g.csOp, scores: scores.slice(0, 8), conf };
+}
+
+/* One-line unified prediction text, e.g. "Barça thắng 2-1" */
+function pickText(T, opp, pr) {
+  const p = pr.pick, sc = `${p.i}-${p.j}`;
+  return pr.outcome === 'W' ? `${T.short} thắng ${sc}` : pr.outcome === 'L' ? `${opp.short || opp.name} thắng ${p.j}-${p.i}` : `Hòa ${sc}`;
 }
 
 function scorerOdds(trendRows, lMe) {
@@ -354,7 +387,7 @@ function predictionFactors(T, opp, fMe, fOpp, pr, isHome, trend) {
   if (fOpp.losing >= 2) f.push({ i: '📉', t: `${on} thua ${fOpp.losing} trận liên tiếp.` });
   if (fOpp.cs >= 4) f.push({ i: '🧱', t: `${on} giữ sạch lưới ${fOpp.cs}/${fOpp.n} trận — hàng thủ chắc chắn.` });
   if (fMe.fts >= 3) f.push({ i: '😶', t: `${nm} tịt ngòi ${fMe.fts}/${fMe.n} trận gần đây.` });
-  if (trend && trend.poss) f.push({ i: '🎛️', t: `Kiểm soát bóng TB ${trend.poss.toFixed(0)}%, ${trend.shots ? trend.shots.toFixed(1) : '?'} cú sút/trận, xG ước tính ${trend.xg ? trend.xg.toFixed(2) : '?'}/trận.` });
+  if (trend && trend.poss) f.push({ i: '🎛️', t: `Trung bình mỗi trận gần đây: kiểm soát bóng ${trend.poss.toFixed(0)}%, ${trend.shots ? trend.shots.toFixed(1) : '?'} cú sút, ${trend.xg ? trend.xg.toFixed(2) : '?'} bàn thắng kỳ vọng.` });
   if (pr.market) {
     const d = pr.model.W - pr.market.W;
     if (Math.abs(d) > 0.08) f.push({ i: '💹', t: `Mô hình ${d > 0 ? 'lạc quan' : 'thận trọng'} hơn nhà cái ${Math.abs(d * 100).toFixed(0)}% về cửa thắng của ${nm}.` });
@@ -363,19 +396,28 @@ function predictionFactors(T, opp, fMe, fOpp, pr, isHome, trend) {
 }
 
 function verdict(T, opp, pr) {
-  const { W, D, L } = pr.fin, top = pr.scores[0];
-  const nm = T.short, on = opp.short || opp.name;
+  const { W, D, L } = pr.fin;
+  const nm = T.short, on = opp.short || opp.name, pc = v => (v * 100).toFixed(0) + '%';
   let v;
-  if (W > 0.6) v = `${nm} là ứng viên sáng giá (${(W * 100).toFixed(0)}%).`;
-  else if (W > 0.45) v = `${nm} nhỉnh hơn nhưng trận đấu còn bỏ ngỏ.`;
-  else if (L > 0.45) v = `${on} được đánh giá cao hơn — ${nm} cần một màn trình diễn đột biến.`;
-  else v = `Trận đấu cân bằng, khả năng hòa đáng kể (${(D * 100).toFixed(0)}%).`;
-  v += ` Tỉ số khả dĩ nhất: ${top.s} (${(top.p * 100).toFixed(0)}%). Tổng bàn kỳ vọng ${(pr.lMe + pr.lOp).toFixed(1)} — ${pr.o25 > 0.55 ? 'nhiều khả năng trên 2.5 bàn' : pr.o25 < 0.45 ? 'nhiều khả năng dưới 2.5 bàn' : 'cửa tài/xỉu 2.5 khá cân bằng'}.`;
+  if (pr.outcome === 'W') v = W >= 0.6 ? `${nm} là ứng viên sáng giá với ${pc(W)} khả năng thắng.` : `${nm} được đánh giá nhỉnh hơn (thắng ${pc(W)}, hòa ${pc(D)}, thua ${pc(L)}) nhưng trận đấu còn bỏ ngỏ.`;
+  else if (pr.outcome === 'L') v = L >= 0.6 ? `${on} được đánh giá cao hơn hẳn với ${pc(L)} khả năng thắng.` : `${on} được đánh giá nhỉnh hơn (${on} thắng ${pc(L)}, hòa ${pc(D)}, ${nm} thắng ${pc(W)}).`;
+  else v = `Trận đấu rất cân bằng, hòa là kết quả khả dĩ nhất (${pc(D)}).`;
+  v += ` Dự đoán: ${pickText(T, opp, pr)}. Tổng số bàn kỳ vọng ${(pr.lMe + pr.lOp).toFixed(1)}, ${pr.o25 > 0.55 ? 'nhiều khả năng có từ 3 bàn trở lên' : pr.o25 < 0.45 ? 'nhiều khả năng có không quá 2 bàn' : 'khả năng có từ 3 bàn trở lên và không quá 2 bàn gần như ngang nhau'}.`;
   return v;
 }
 
+async function quickPick(key, sched, m) {
+  try {
+    const T = TEAMS[key], off = r => r.filter(x => !/friendly/i.test(x.leagueSlug));
+    const oppS = await loadOpponentSchedule(m.opp.id, m.leagueSlug);
+    let odds = null; try { odds = (await loadSummary(m.id, true)).odds; } catch (e) { }
+    const pr = predict(form(off(sched.results)), form(off(oppS.results)), m.isHome, odds, m.isHome);
+    return `\n🔮 Dự đoán: ${pickText(T, m.opp, pr)} (${T.short} thắng ${(pr.fin.W * 100).toFixed(0)}%, hòa ${(pr.fin.D * 100).toFixed(0)}%, thua ${(pr.fin.L * 100).toFixed(0)}%)`;
+  } catch (e) { return ''; }
+}
+
 /* ---------------------------- formatting ---------------------------- */
-function fmtDate(iso, opt) { try { return new Date(iso).toLocaleString('vi-VN', opt || { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return iso; } }
+function fmtDate(iso, opt) { try { return new Date(iso).toLocaleString('vi-VN', opt || { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return iso; } }
 
 /* ---------------------------- notifications ---------------------------- */
 async function checkAndNotify(show, { force = false } = {}) {
@@ -397,9 +439,9 @@ async function checkAndNotify(show, { force = false } = {}) {
         const sum = await loadSummary(last.id);
         const a = analyzeMatch(sum, T.id);
         const parts = [];
-        if (a.poss != null) parts.push(`Kiểm soát ${a.poss.toFixed(0)}%`);
-        if (a.a.totalShots != null) parts.push(`Sút ${a.a.totalShots}(${a.a.shotsOnTarget || 0})`);
-        parts.push(`xG~${a.xg.toFixed(1)}`, `Điểm ${a.rating}/10`);
+        if (a.poss != null) parts.push(`Kiểm soát bóng ${a.poss.toFixed(0)}%`);
+        if (a.a.totalShots != null) parts.push(`${a.a.totalShots} cú sút (${a.a.shotsOnTarget || 0} trúng đích)`);
+        parts.push(`Bàn thắng kỳ vọng ${a.xg.toFixed(1)}`, `Điểm ${a.rating}/10`);
         body += '\n' + parts.join(' · ');
         const rc = matchRecap(sum, a);
         if (rc[1]) body += `\n⚽ ${rc[1].t}`;
@@ -407,7 +449,7 @@ async function checkAndNotify(show, { force = false } = {}) {
         if (tp) body += `\n${tp.t}`;
         else if (a.insights[0]) body += `\n${a.insights[0].t}`;
       } catch (e) { }
-      if (next) body += `\n📅 Trận tới: vs ${next.opp.short} · ${fmtDate(next.date)}`;
+      if (next) body += `\n📅 Trận tới: gặp ${next.opp.short} (${next.isHome ? 'sân nhà' : 'sân khách'}) · ${fmtDate(next.date)}`;
       const em = last.result === 'W' ? '✅' : last.result === 'L' ? '❌' : '➖';
       await show(`${em} Kết thúc: ${T.short} ${last.gf}-${last.ga} ${last.opp.short}`, { body, tag: 'ft-' + last.id, data: { url: './#match/' + key + '/' + last.id } });
       notified['ft:' + last.id] = Date.now(); sent.push('ft');
@@ -415,11 +457,11 @@ async function checkAndNotify(show, { force = false } = {}) {
     if (next) {
       const h = (new Date(next.date) - Date.now()) / 36e5;
       if (h > 1 && h <= 24 && !notified['d1:' + next.id]) {
-        await show(`📅 ${T.short} thi đấu trong ${Math.round(h)} giờ nữa`, { body: `${next.isHome ? 'vs' : '@'} ${next.opp.name} · ${next.league}\n${fmtDate(next.date)} · ${next.venue}\nMở app xem dự đoán chi tiết.`, tag: 'd1-' + next.id, data: { url: './#predict/' + key + '/' + next.id } });
+        await show(`📅 ${T.short} thi đấu trong ${Math.round(h)} giờ nữa`, { body: `Gặp ${next.opp.name} (${next.isHome ? 'sân nhà' : 'sân khách'}) · ${next.league}\n${fmtDate(next.date)} · ${next.venue}${await quickPick(key, s, next)}\nMở ứng dụng để xem phân tích dự đoán chi tiết.`, tag: 'd1-' + next.id, data: { url: './#predict/' + key + '/' + next.id } });
         notified['d1:' + next.id] = Date.now(); sent.push('d1');
       }
       if (h > 0 && h <= 1 && !notified['h1:' + next.id]) {
-        await show(`⏰ Sắp bóng lăn: ${T.short} vs ${next.opp.short}`, { body: `Bắt đầu lúc ${fmtDate(next.date, { hour: '2-digit', minute: '2-digit' })} · ${next.league}`, tag: 'h1-' + next.id, data: { url: './#predict/' + key + '/' + next.id } });
+        await show(`⏰ Sắp bóng lăn: ${T.short} gặp ${next.opp.short}`, { body: `Bắt đầu lúc ${fmtDate(next.date, { hour: '2-digit', minute: '2-digit' })} · ${next.league}`, tag: 'h1-' + next.id, data: { url: './#predict/' + key + '/' + next.id } });
         notified['h1:' + next.id] = Date.now(); sent.push('h1');
       }
     }
@@ -429,7 +471,7 @@ async function checkAndNotify(show, { force = false } = {}) {
   if (!notified['wk:' + wk] && upcomingAll.length) {
     const in7 = upcomingAll.filter(m => new Date(m.date) - Date.now() < 7 * 864e5).sort((a, b) => new Date(a.date) - new Date(b.date));
     if (in7.length) {
-      const body = in7.map(m => `${m.T.short} ${m.isHome ? 'vs' : '@'} ${m.opp.short} — ${fmtDate(m.date)}`).join('\n');
+      const body = in7.map(m => `${m.T.short} gặp ${m.opp.short} (${m.isHome ? 'sân nhà' : 'sân khách'}) — ${fmtDate(m.date)}`).join('\n');
       await show(`🗓️ Lịch thi đấu 7 ngày tới (${in7.length} trận)`, { body, tag: 'wk-' + wk, data: { url: './#schedule' } });
       sent.push('wk');
     }

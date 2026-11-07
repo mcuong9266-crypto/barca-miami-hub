@@ -83,17 +83,17 @@ function animateIn(root = view) {
     root.querySelectorAll('[data-off]').forEach(el => el.style.strokeDashoffset = el.dataset.off);
   }));
 }
-function formChips(arr) { return `<div class="form">${arr.map(r => `<span class="${r}">${r === 'W' ? 'T' : r === 'D' ? 'H' : 'B'}</span>`).join('')}</div>`; }
+function formChips(arr) { return `<div class="form">${arr.map(r => `<span class="${r}">${r === 'W' ? 'Thắng' : r === 'D' ? 'Hòa' : 'Thua'}</span>`).join('')}</div>`; }
 function matchRow(m, { team, showTeam } = {}) {
   const key = team || S.team, T = TEAMS[key];
-  const right = m.completed ? `<div class="res ${m.result}">${m.gf}-${m.ga}${m.me.pen != null ? `<div style="font-size:10px">pen ${m.me.pen}-${m.opp.pen}</div>` : ''}</div>`
+  const right = m.completed ? `<div class="res ${m.result}">${m.gf}-${m.ga}${m.me.pen != null ? `<div style="font-size:10px">luân lưu ${m.me.pen}-${m.opp.pen}</div>` : ''}</div>`
     : m.state === 'in' ? `<div class="res up" style="color:#fca5a5">● ${esc(m.clock)}<br>${m.liveGf ?? 0}-${m.liveGa ?? 0}</div>`
       : `<div class="res up">${new Date(m.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</div>`;
   const tab = m.completed ? 'match' : 'predict', attr = m.completed ? `data-match="${m.id}"` : `data-predict="${m.id}"`;
   return `<div class="row" data-go="${tab}" data-team="${key}" ${attr}>
     ${logo(m.opp.logo)}
-    <div><div class="nm">${showTeam ? `<span class="tbadge" style="background:${key === 'barca' ? '#a50044' : '#e8649b'}"></span>${esc(T.short)} ${m.isHome ? 'vs' : '@'} ` : (m.isHome ? 'vs ' : '@ ')}${esc(m.opp.short)}</div>
-    <div class="info">${esc(fmtDate(m.date))} · ${esc(m.league)}${m.isHome ? ' · 🏠' : ''}</div></div>
+    <div><div class="nm">${showTeam ? `<span class="tbadge" style="background:${key === 'barca' ? '#a50044' : '#e8649b'}"></span>${esc(T.short)} gặp ` : 'Gặp '}${esc(m.opp.short)}</div>
+    <div class="info">${esc(fmtDate(m.date))} · ${esc(m.league)} · ${m.isHome ? '🏠 Sân nhà' : '✈️ Sân khách'}</div></div>
     ${right}</div>`;
 }
 function gauge(val, max, label, color) {
@@ -120,7 +120,7 @@ function lineChart(labels, series, { h = 170, min, max, suf = '', avg } = {}) {
   let g = '';
   for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4; g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.07)"/><text x="${pl - 6}" y="${y(v) + 3}" fill="#7c869c" font-size="9" text-anchor="end">${+v.toFixed(1)}${suf}</text>`; }
   labels.forEach((l, i) => g += `<text x="${x(i)}" y="${H - 6}" fill="#7c869c" font-size="8.5" text-anchor="middle">${esc(l)}</text>`);
-  if (avg != null) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(avg)}" y2="${y(avg)}" stroke="var(--acc)" stroke-dasharray="4 4" opacity=".6"/><text x="${W - pr}" y="${y(avg) - 4}" fill="var(--acc)" font-size="9" text-anchor="end">TB ${avg.toFixed(1)}${suf}</text>`;
+  if (avg != null) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(avg)}" y2="${y(avg)}" stroke="var(--acc)" stroke-dasharray="4 4" opacity=".6"/><text x="${W - pr}" y="${y(avg) - 4}" fill="var(--acc)" font-size="9" text-anchor="end">Trung bình ${avg.toFixed(1)}${suf}</text>`;
   series.forEach((s, si) => {
     const pts = s.v.map((v, i) => v == null ? null : [x(i), y(v)]).filter(Boolean);
     if (!pts.length) return;
@@ -140,7 +140,7 @@ function goalBars(rows) {
     const x0 = pl + i * bw + bw * 0.15, w = bw * 0.33;
     g += `<rect class="grow" style="animation-delay:${i * 60}ms" x="${x0}" y="${y(r.gf)}" width="${w}" height="${Math.max(0, H - pb - y(r.gf))}" rx="3" fill="url(#gb)"/>`;
     g += `<rect class="grow" style="animation-delay:${i * 60 + 30}ms" x="${x0 + w + 2}" y="${y(r.ga)}" width="${w}" height="${Math.max(0, H - pb - y(r.ga))}" rx="3" fill="#64748b"/>`;
-    g += `<text x="${x0 + w}" y="${H - 8}" fill="${r.result === 'W' ? '#4ade80' : r.result === 'L' ? '#f87171' : '#fbbf24'}" font-size="8.5" text-anchor="middle" font-weight="700">${esc(r.opp)}</text>`;
+    g += `<text x="${x0 + w}" y="${H - 8}" fill="${r.result === 'W' ? '#4ade80' : r.result === 'L' ? '#f87171' : '#fbbf24'}" font-size="8.5" text-anchor="middle" font-weight="700">${esc(new Date(r.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }))}</text>`;
   });
   return `<svg class="chart" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--acc)"/><stop offset="1" stop-color="var(--c1)"/></linearGradient></defs>${g}</svg>
   <div class="legend"><span><i style="background:var(--acc)"></i>Bàn thắng</span><span><i style="background:#64748b"></i>Bàn thua</span></div>`;
@@ -197,7 +197,7 @@ async function vHome(force) {
     const H = next.isHome ? next.me : next.opp, A = next.isHome ? next.opp : next.me;
     h += `<div class="card hero" data-go="predict" data-predict="${next.id}"><span class="shine"></span>
       <div style="display:flex;justify-content:space-between"><span class="chip">⚡ TRẬN TIẾP THEO</span><span class="chip">${esc(next.league)}</span></div>
-      <div class="vs"><div class="t">${logo(H.logo)}${esc(H.short)}</div><div class="mid">VS</div><div class="t">${logo(A.logo)}${esc(A.short)}</div></div>
+      <div class="vs"><div class="t">${logo(H.logo)}${esc(H.short)}</div><div class="mid">GẶP</div><div class="t">${logo(A.logo)}${esc(A.short)}</div></div>
       ${countdownHTML(next.date)}
       <div class="meta">📅 ${esc(fmtDate(next.date, { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}<br>📍 ${esc(next.venue || '—')}</div>
       <div id="home-prob" style="margin-top:12px"><div class="mut" style="text-align:center">🔮 Đang tính xác suất…</div></div></div>`;
@@ -207,10 +207,10 @@ async function vHome(force) {
     <div class="vs" style="margin:6px 0"><div class="t">${logo(last.me.logo)}${esc(last.me.short)}</div>
     <div class="score"><span class="res ${last.result}" style="font-size:30px;padding:6px 14px">${last.gf} - ${last.ga}</span><small>${esc(last.league)} · ${esc(fmtDate(last.date, { day: '2-digit', month: '2-digit' }))}</small></div>
     <div class="t">${logo(last.opp.logo)}${esc(last.opp.short)}</div></div><div id="home-last">${skel(1)}</div></div>`;
-  h += `<div class="card"><div class="h"><h2>Mùa giải ${esc(d.info?.seasonSummary || '')}</h2><span class="sub">${esc(d.info?.standingSummary || '')}</span></div>
-    <div class="tiles t4"><div class="tile"><b>${off.length}</b><span>Trận</span></div><div class="tile"><b>${W}-${Dr}-${L}</b><span>T-H-B</span></div><div class="tile"><b>${gf}</b><span>Bàn thắng</span></div><div class="tile"><b>${ga}</b><span>Bàn thua</span></div></div>
+  h += `<div class="card"><div class="h"><h2>Mùa giải ${esc(d.info?.seasonSummary || '')}</h2><span class="sub">${esc(standingVi(d.info?.standingSummary, key))}</span></div>
+    <div class="tiles t4"><div class="tile"><b>${off.length}</b><span>Trận</span></div><div class="tile"><b>${W}-${Dr}-${L}</b><span>Thắng-Hòa-Thua</span></div><div class="tile"><b>${gf}</b><span>Bàn thắng</span></div><div class="tile"><b>${ga}</b><span>Bàn thua</span></div></div>
     <div class="tiles" style="margin-top:8px"><div class="tile"><b>${off.length ? (gf / off.length).toFixed(2) : '-'}</b><span>Bàn/trận</span></div><div class="tile"><b>${off.length ? Math.round(W / off.length * 100) : 0}%</b><span>Tỉ lệ thắng</span></div><div class="tile"><b>${f.cs}</b><span>Sạch lưới</span></div></div>
-    <div class="h" style="margin:14px 0 0"><span class="sub">Phong độ 5 trận</span>${formChips(off.slice(-5).map(m => m.result))}</div></div>`;
+    <div class="h" style="margin:14px 0 0"><span class="sub">Phong độ 5 trận gần nhất</span>${formChips(off.slice(-5).map(m => m.result))}</div></div>`;
   const ups = d.upcoming.filter(m => m.state === 'pre').slice(1, 4);
   if (ups.length) h += `<div class="card"><div class="h"><h2>Sắp diễn ra</h2><span class="link" data-go="schedule">Tất cả →</span></div>${ups.map(m => matchRow(m)).join('')}</div>`;
   const other = key === 'barca' ? 'miami' : 'barca';
@@ -224,12 +224,12 @@ async function hydrateHome(tok) {
   const jobs = [];
   if (next) jobs.push(getPrediction(key, next).then(p => {
     if (tok !== renderToken) return; const el = $('#home-prob'); if (!el) return;
-    el.innerHTML = probBar(p.pr.fin, p.T, next.opp) + `<div class="meta">Tỉ số khả dĩ: <b>${p.pr.scores[0].s}</b> · xG ${p.pr.lMe.toFixed(1)} - ${p.pr.lOp.toFixed(1)} · Chạm để xem chi tiết</div>`; animateIn(el);
+    el.innerHTML = probBar(p.pr.fin, p.T, next.opp) + `<div class="meta" style="font-size:14px">🔮 Dự đoán: <b>${esc(pickText(p.T, next.opp, p.pr))}</b></div><div class="meta">Bàn thắng kỳ vọng: ${esc(p.T.short)} ${p.pr.lMe.toFixed(1)} – ${p.pr.lOp.toFixed(1)} ${esc(next.opp.short)} · Chạm để xem chi tiết</div>`; animateIn(el);
   }).catch(() => { const el = $('#home-prob'); if (el) el.innerHTML = ''; }));
   if (last) jobs.push(loadSummary(last.id).then(s => {
     if (tok !== renderToken) return; const el = $('#home-last'); if (!el) return;
     const a = analyzeMatch(s, TEAMS[key].id);
-    el.innerHTML = `<div class="tiles t4"><div class="tile"><b>${a.poss != null ? a.poss.toFixed(0) + '%' : '-'}</b><span>Kiểm soát</span></div><div class="tile"><b>${a.a.totalShots ?? '-'}</b><span>Cú sút</span></div><div class="tile"><b>${a.xg.toFixed(1)}</b><span>xG ước tính</span></div><div class="tile"><b>${a.rating}</b><span>Điểm trận</span></div></div>
+    el.innerHTML = `<div class="tiles t4"><div class="tile"><b>${a.poss != null ? a.poss.toFixed(0) + '%' : '-'}</b><span>Kiểm soát</span></div><div class="tile"><b>${a.a.totalShots ?? '-'}</b><span>Cú sút</span></div><div class="tile"><b>${a.xg.toFixed(1)}</b><span>Bàn thắng kỳ vọng</span></div><div class="tile"><b>${a.rating}</b><span>Điểm trận</span></div></div>
       <div class="sec-title" style="margin-top:14px">📰 Tóm tắt</div>${matchRecap(s, a).slice(0, 3).map(x => `<div class="ins"><i>${x.i}</i><div>${esc(x.t)}</div></div>`).join('')}`;
   }).catch(() => { const el = $('#home-last'); if (el) el.innerHTML = ''; }));
   jobs.push(getData(other).then(o => {
@@ -279,22 +279,22 @@ async function vMatch(force) {
   if (!trends) getTrends(key).catch(() => { });
   const A = a.a, B = a.b;
   const H = sum.teams.find(t => t.home) || a.me, Aw = sum.teams.find(t => !t.home) || a.opp;
-  let h = `<select class="sel" id="sel-match">${res.map(x => `<option value="${x.id}" ${x.id === m.id ? 'selected' : ''}>${esc(fmtDate(x.date, { day: '2-digit', month: '2-digit' }))} · ${x.isHome ? 'vs' : '@'} ${esc(x.opp.short)} (${x.gf}-${x.ga}) · ${esc(x.league)}</option>`).join('')}</select>`;
+  let h = `<select class="sel" id="sel-match">${res.map(x => `<option value="${x.id}" ${x.id === m.id ? 'selected' : ''}>${esc(fmtDate(x.date, { day: '2-digit', month: '2-digit' }))} · Gặp ${esc(x.opp.short)} (${x.isHome ? 'sân nhà' : 'sân khách'}) ${x.gf}-${x.ga} · ${esc(x.league)}</option>`).join('')}</select>`;
   h += `<div class="card hero"><span class="shine"></span><div style="display:flex;justify-content:space-between"><span class="chip">${esc(m.league)}</span><span class="chip">${a.result === 'W' ? '✅ THẮNG' : a.result === 'L' ? '❌ THUA' : '➖ HÒA'}</span></div>
-    <div class="vs"><div class="t">${logo(H.logo)}${esc(H.name)}</div><div class="score">${H.score ?? '-'} - ${Aw.score ?? '-'}${H.pen != null ? `<small>Luân lưu ${H.pen}-${Aw.pen}</small>` : `<small>${esc(sum.detail || 'FT')}</small>`}</div><div class="t">${logo(Aw.logo)}${esc(Aw.name)}</div></div>
+    <div class="vs"><div class="t">${logo(H.logo)}${esc(H.name)}</div><div class="score">${H.score ?? '-'} - ${Aw.score ?? '-'}${H.pen != null ? `<small>Luân lưu ${H.pen}-${Aw.pen}</small>` : `<small>Kết thúc</small>`}</div><div class="t">${logo(Aw.logo)}${esc(Aw.name)}</div></div>
     <div class="meta">${esc(fmtDate(m.date, { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }))} · ${esc(sum.venue || m.venue)}${sum.attendance ? ' · 👥 ' + Number(sum.attendance).toLocaleString('vi-VN') : ''}</div></div>`;
   h += `<div class="card"><div class="h"><h2>Đánh giá màn trình diễn</h2><span class="sub">${esc(T.short)}</span></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center">${gauge(a.rating, 10, 'Điểm /10')}${a.dom != null ? gauge(a.dom, 100, 'Chỉ số áp đảo', 'var(--c2)') : ''}</div>
-    <div class="tiles" style="margin-top:12px"><div class="tile"><b>${a.xg.toFixed(2)}</b><span>xG ước tính<br>đối thủ ${a.xga.toFixed(2)}</span></div>
+    <div class="tiles" style="margin-top:12px"><div class="tile"><b>${a.xg.toFixed(2)}</b><span>Bàn thắng kỳ vọng<br>đối thủ: ${a.xga.toFixed(2)}</span></div>
     <div class="tile"><b>${a.conv != null ? a.conv.toFixed(0) + '%' : '-'}</b><span>Hiệu suất<br>dứt điểm</span></div><div class="tile"><b>${a.acc != null ? a.acc.toFixed(0) + '%' : '-'}</b><span>Sút<br>trúng đích</span></div></div></div>`;
   const ins = a.insights;
   h += `<div class="card"><div class="h"><h2>📰 Tóm tắt trận đấu</h2></div>${matchRecap(sum, a).map((x, i) => `<div class="ins" style="animation-delay:${i * 60}ms"><i>${x.i}</i><div>${esc(x.t)}</div></div>`).join('')}</div>`;
   h += `<div class="card"><div class="h"><h2>🧠 Nhận định chuyên sâu</h2></div>${ins.length ? ins.map((x, i) => `<div class="ins" style="animation-delay:${i * 70}ms"><i>${x.i}</i><div>${esc(x.t)}</div></div>`).join('') : '<div class="mut">Không đủ dữ liệu thống kê cho trận này.</div>'}
     ${!others ? '<div class="disc">Đang tải dữ liệu các trận trước để so sánh với trung bình…</div>' : ''}</div>`;
   if (Object.keys(A).length) {
-    h += `<div class="card"><div class="h"><h2>Thống kê trận đấu</h2><span class="sub">${esc(a.me.abbr)} vs ${esc(a.opp.abbr)}</span></div>
+    h += `<div class="card"><div class="h"><h2>Thống kê trận đấu</h2><span class="sub">${esc(a.me.name)} – ${esc(a.opp.name)}</span></div>
       ${cmp('Kiểm soát bóng', A.possessionPct, B.possessionPct, { suf: '%' })}${cmp('Cú sút', A.totalShots, B.totalShots)}${cmp('Sút trúng đích', A.shotsOnTarget, B.shotsOnTarget)}
-      ${cmp('xG ước tính', a.xg, a.xga, { dec: 2 })}${cmp('Đường chuyền', A.totalPasses, B.totalPasses)}${cmp('Chuyền chính xác', passP(A), passP(B), { suf: '%' })}
+      ${cmp('Bàn thắng kỳ vọng', a.xg, a.xga, { dec: 2 })}${cmp('Đường chuyền', A.totalPasses, B.totalPasses)}${cmp('Chuyền chính xác', passP(A), passP(B), { suf: '%' })}
       ${cmp('Phạt góc', A.wonCorners, B.wonCorners)}${cmp('Tắc bóng thành công', A.effectiveTackles, B.effectiveTackles)}${cmp('Cắt bóng', A.interceptions, B.interceptions)}
       ${cmp('Phá bóng', A.effectiveClearance, B.effectiveClearance)}${cmp('Cứu thua', A.saves, B.saves)}${cmp('Tạt bóng', A.totalCrosses, B.totalCrosses)}
       ${cmp('Phạm lỗi', A.foulsCommitted, B.foulsCommitted, { inv: true })}${cmp('Thẻ vàng', A.yellowCards, B.yellowCards, { inv: true })}${cmp('Việt vị', A.offsides, B.offsides, { inv: true })}</div>`;
@@ -303,9 +303,9 @@ async function vMatch(force) {
   const evs = sum.events.filter(e => !e.shootout);
   if (evs.length) {
     const icon = e => e.scoring ? '⚽' : /red/.test(e.type) ? '🟥' : /yellow/.test(e.type) ? '🟨' : /substitution/.test(e.type) ? '🔄' : '•';
-    h += `<div class="card"><div class="h"><h2>⏱️ Diễn biến</h2><span class="sub">${esc(H.abbr)} | ${esc(Aw.abbr)}</span></div><div class="tl">${evs.map((e, i) => {
+    h += `<div class="card"><div class="h"><h2>⏱️ Diễn biến</h2><span class="sub">${esc(H.name)} | ${esc(Aw.name)}</span></div><div class="tl">${evs.map((e, i) => {
       const side = e.teamId === H.id ? 'L' : 'R';
-      const txt = `${icon(e)} <b>${esc(e.player)}</b>${e.scoring && /own/i.test(e.type) ? ' (phản lưới)' : ''}${e.scoring && /penalty/i.test(e.type) ? ' (pen)' : ''}${/substitution/.test(e.type) && e.assist ? `<small>ra: ${esc(e.assist)}</small>` : ''}`;
+      const txt = `${icon(e)} <b>${esc(e.player)}</b>${e.scoring && /own/i.test(e.type) ? ' (phản lưới)' : ''}${e.scoring && /penalty/i.test(e.type) ? ' (phạt đền)' : ''}${/substitution/.test(e.type) && e.assist ? `<small>ra: ${esc(e.assist)}</small>` : ''}`;
       return `<div class="ev" style="animation-delay:${i * 30}ms"><div class="L">${side === 'L' ? txt : ''}</div><div class="m">${esc(e.min || '')}</div><div class="R">${side === 'R' ? txt : ''}</div></div>`;
     }).join('')}</div></div>`;
   }
@@ -322,23 +322,23 @@ async function vPredict(force) {
   const { pr, fMe, fOpp, h2h, odds } = p, opp = m.opp;
   const tavg = trows ? trendAverages(trows) : null;
   const H = m.isHome ? m.me : m.opp, A = m.isHome ? m.opp : m.me;
-  let h = `<select class="sel" id="sel-pred">${ups.map(x => `<option value="${x.id}" ${x.id === m.id ? 'selected' : ''}>${esc(fmtDate(x.date, { day: '2-digit', month: '2-digit' }))} · ${x.isHome ? 'vs' : '@'} ${esc(x.opp.short)} · ${esc(x.league)}</option>`).join('')}</select>`;
+  let h = `<select class="sel" id="sel-pred">${ups.map(x => `<option value="${x.id}" ${x.id === m.id ? 'selected' : ''}>${esc(fmtDate(x.date, { day: '2-digit', month: '2-digit' }))} · Gặp ${esc(x.opp.short)} (${x.isHome ? 'sân nhà' : 'sân khách'}) · ${esc(x.league)}</option>`).join('')}</select>`;
   h += `<div class="card hero"><span class="shine"></span><div style="display:flex;justify-content:space-between"><span class="chip">🔮 DỰ ĐOÁN</span><span class="chip">${esc(m.league)}</span></div>
-    <div class="vs"><div class="t">${logo(H.logo)}${esc(H.short)}</div><div class="score" style="font-size:34px">${(m.isHome ? pr.lMe : pr.lOp).toFixed(1)} - ${(m.isHome ? pr.lOp : pr.lMe).toFixed(1)}<small>Bàn thắng kỳ vọng (xG)</small></div><div class="t">${logo(A.logo)}${esc(A.short)}</div></div>
-    ${countdownHTML(m.date)}<div class="meta">📅 ${esc(fmtDate(m.date, { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))} · 📍 ${esc(m.venue || '—')}</div></div>`;
+    <div class="vs"><div class="t">${logo(H.logo)}${esc(H.short)}</div><div class="score">${m.isHome ? pr.pick.i : pr.pick.j} - ${m.isHome ? pr.pick.j : pr.pick.i}<small>Tỉ số dự đoán</small></div><div class="t">${logo(A.logo)}${esc(A.short)}</div></div>
+    <div class="meta" style="font-size:15px;font-weight:800">🔮 ${esc(pickText(T, opp, pr))}</div><div class="meta">Bàn thắng kỳ vọng: ${esc(H.short)} ${(m.isHome ? pr.lMe : pr.lOp).toFixed(1)} – ${(m.isHome ? pr.lOp : pr.lMe).toFixed(1)} ${esc(A.short)}</div>${countdownHTML(m.date)}<div class="meta">📅 ${esc(fmtDate(m.date, { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))} · 📍 ${esc(m.venue || '—')}</div></div>`;
   h += `<div class="card"><div class="h"><h2>Xác suất kết quả</h2><span class="sub">Độ tin cậy ${pr.conf}%</span></div>${probBar(pr.fin, T, opp)}
     <div style="margin-top:14px">
-    <div class="mk"><span>Mô hình Poisson</span><span class="mut">${P(pr.model.W)} / ${P(pr.model.D)} / ${P(pr.model.L)}</span><b></b></div>
+    <div class="sec-title" style="margin:4px 0">Hai nguồn đã được kết hợp (thắng / hòa / thua)</div><div class="mk"><span>Mô hình thống kê</span><span class="mut">${P(pr.model.W)} / ${P(pr.model.D)} / ${P(pr.model.L)}</span><b></b></div>
     ${pr.market ? `<div class="mk"><span>Nhà cái (${esc(odds.provider)})</span><span class="mut">${P(pr.market.W)} / ${P(pr.market.D)} / ${P(pr.market.L)}</span><b></b></div>` : '<div class="mut">Chưa có tỉ lệ nhà cái — dùng 100% mô hình.</div>'}
     </div><div class="ins" style="margin-top:6px"><i>🎙️</i><div><b>Nhận định:</b> ${esc(verdict(T, opp, pr))}</div></div></div>`;
-  h += `<div class="card"><div class="h"><h2>Tỉ số khả dĩ nhất</h2><span class="sub">${esc(T.short)} trước</span></div>
+  h += `<div class="card"><div class="h"><h2>Các tỉ số khả dĩ</h2><span class="sub">${esc(T.short)} – ${esc(opp.short)}</span></div>
     <div class="scores">${pr.scores.slice(0, 8).map(s => `<div><b>${s.s}</b><span>${(s.p * 100).toFixed(1)}%</span></div>`).join('')}</div>
     <div class="sec-title" style="margin-top:16px">Bản đồ nhiệt tỉ số</div>
-    <div class="heat"><div class="ax">${esc(T.abbr || '')}</div>${[0, 1, 2, 3, 4, 5].map(j => `<div class="ax">${j}</div>`).join('')}
+    <div class="heat"><div class="ax"></div>${[0, 1, 2, 3, 4, 5].map(j => `<div class="ax">${j}</div>`).join('')}
     ${[0, 1, 2, 3, 4, 5].map(i => `<div class="ax">${i}</div>` + [0, 1, 2, 3, 4, 5].map(j => { const v = pr.M[i][j], mx = pr.scores[0].p, k = v / mx; return `<div style="background:${i > j ? `rgba(34,197,94,${0.1 + k * 0.85})` : i === j ? `rgba(245,158,11,${0.1 + k * 0.85})` : `rgba(239,68,68,${0.1 + k * 0.85})`}">${(v * 100).toFixed(0)}</div>`; }).join('')).join('')}</div>
     <div class="legend"><span>Hàng: bàn của ${esc(T.short)} · Cột: bàn của ${esc(opp.short)} · đơn vị %</span></div></div>`;
   const mk = (l, v) => `<div class="mk"><span>${l}</span><div class="bar"><i data-w="${v * 100}"></i></div><b>${P(v)}</b></div>`;
-  h += `<div class="card"><div class="h"><h2>Thị trường bàn thắng</h2>${odds && odds.ou ? `<span class="sub">Kèo nhà cái: ${odds.ou}</span>` : ''}</div>
+  h += `<div class="card"><div class="h"><h2>Thị trường bàn thắng</h2>${odds && odds.ou ? `<span class="sub">Mốc số bàn của nhà cái: ${odds.ou}</span>` : ''}</div>
     ${mk('Trên 1.5 bàn', pr.o15)}${mk('Trên 2.5 bàn', pr.o25)}${mk('Trên 3.5 bàn', pr.o35)}${mk('Cả hai đội ghi bàn', pr.btts)}${mk(esc(T.short) + ' sạch lưới', pr.csMe)}${mk(esc(opp.short) + ' sạch lưới', pr.csOp)}</div>`;
   const nz = (v, lo, hi) => (v - lo) / (hi - lo);
   const axes = ['Tấn công', 'Phòng ngự', 'Phong độ', 'Sân bãi', 'Ổn định'];
@@ -355,8 +355,8 @@ async function vPredict(force) {
     if (sc.length) h += `<div class="card"><div class="h"><h2>⚽ Khả năng ghi bàn</h2><span class="sub">dựa trên ${trows.length} trận gần nhất</span></div>${sc.map(s => mk(`${esc(s.player)} <span class="mut">(${s.goals} bàn)</span>`, s.prob)).join('')}</div>`;
   }
   h += `<div class="card"><div class="h"><h2>🔍 Yếu tố then chốt</h2></div>${predictionFactors(T, opp, fMe, fOpp, pr, m.isHome, tavg).map((x, i) => `<div class="ins" style="animation-delay:${i * 60}ms"><i>${x.i}</i><div>${esc(x.t)}</div></div>`).join('')}</div>`;
-  if (h2h.length) h += `<div class="card"><div class="h"><h2>Đối đầu gần đây</h2></div>${h2h.map(x => { const r = x.result === 'W' ? 'L' : x.result === 'L' ? 'W' : 'D'; return `<div class="row"><div class="res ${r}">${x.ga}-${x.gf}</div><div><div class="nm">${esc(T.short)} ${x.isHome ? '@' : 'vs'} ${esc(opp.short)}</div><div class="info">${esc(fmtDate(x.date, { day: '2-digit', month: '2-digit', year: 'numeric' }))} · ${esc(x.league)}</div></div><div></div></div>`; }).join('')}</div>`;
-  if (fOpp.games.length) h += `<div class="card"><div class="h"><h2>Phong độ ${esc(opp.short)}</h2></div>${fOpp.games.slice(0, 5).map(x => `<div class="row" style="cursor:default">${logo(x.opp.logo)}<div><div class="nm">${x.isHome ? 'vs' : '@'} ${esc(x.opp.short)}</div><div class="info">${esc(fmtDate(x.date, { day: '2-digit', month: '2-digit' }))} · ${esc(x.league)}</div></div><div class="res ${x.result}">${x.gf}-${x.ga}</div></div>`).join('')}</div>`;
+  if (h2h.length) h += `<div class="card"><div class="h"><h2>Đối đầu gần đây</h2></div>${h2h.map(x => { const r = x.result === 'W' ? 'L' : x.result === 'L' ? 'W' : 'D'; return `<div class="row"><div class="res ${r}">${x.ga}-${x.gf}</div><div><div class="nm">${esc(T.short)} gặp ${esc(opp.short)} (${x.isHome ? 'sân khách' : 'sân nhà'})</div><div class="info">${esc(fmtDate(x.date, { day: '2-digit', month: '2-digit', year: 'numeric' }))} · ${esc(x.league)}</div></div><div></div></div>`; }).join('')}</div>`;
+  if (fOpp.games.length) h += `<div class="card"><div class="h"><h2>Phong độ ${esc(opp.short)}</h2></div>${fOpp.games.slice(0, 5).map(x => `<div class="row" style="cursor:default">${logo(x.opp.logo)}<div><div class="nm">Gặp ${esc(x.opp.short)} (${x.isHome ? 'sân nhà' : 'sân khách'})</div><div class="info">${esc(fmtDate(x.date, { day: '2-digit', month: '2-digit' }))} · ${esc(x.league)}</div></div><div class="res ${x.result}">${x.gf}-${x.ga}</div></div>`).join('')}</div>`;
   h += `<p class="disc">Mô hình Poisson có trọng số phong độ (10 trận, trận gần hơn nặng hơn), hiệu chỉnh sân nhà/khách và kết hợp 45% xác suất từ tỉ lệ nhà cái (nếu có). Chỉ mang tính tham khảo.</p>`;
   setTimeout(() => $('#sel-pred')?.addEventListener('change', e => { S.sel.predict = e.target.value; render(); }));
   return h;
@@ -367,33 +367,33 @@ async function vTrends(force) {
   if (force) delete S.trends[key];
   const rows = await getTrends(key);
   if (!rows.length) return '<div class="card empty">Chưa có dữ liệu.</div>';
-  const lab = rows.map(r => r.opp);
+  const lab = rows.map(r => new Date(r.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }));
   const recent = rows.slice(-5), prev = rows.slice(-10, -5);
   const tile = (label, k, suf = '', dec = 1, inv = false) => {
     const a = avgOf(recent, k), b = avgOf(prev, k); if (a == null) return '';
     const d = b != null ? a - b : null, good = d == null ? null : inv ? d < 0 : d > 0;
     return `<div class="tile"><b>${a.toFixed(dec)}${suf}</b><span>${label}</span>${d != null && Math.abs(d) > 0.05 ? `<div class="tr ${good ? 'up-c' : 'dn-c'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(dec)}${suf}</div>` : '<div class="tr mut">—</div>'}</div>`;
   };
-  let h = `<div class="card"><div class="h"><h2>5 trận gần nhất vs 5 trận trước</h2></div><div class="tiles">
-    ${tile('Bàn thắng', 'gf')}${tile('Bàn thua', 'ga', '', 1, true)}${tile('xG ước tính', 'xg', '', 2)}${tile('Kiểm soát', 'poss', '%', 0)}${tile('Cú sút', 'shots')}${tile('Sút trúng', 'sot')}</div></div>`;
+  let h = `<div class="card"><div class="h"><h2>5 trận gần nhất so với 5 trận trước</h2></div><div class="tiles">
+    ${tile('Bàn thắng', 'gf')}${tile('Bàn thua', 'ga', '', 1, true)}${tile('Bàn thắng kỳ vọng', 'xg', '', 2)}${tile('Kiểm soát', 'poss', '%', 0)}${tile('Cú sút', 'shots')}${tile('Sút trúng', 'sot')}</div></div>`;
   // narrative
   const notes = [];
   const g5 = avgOf(recent, 'gf'), g0 = avgOf(prev, 'gf'), c5 = avgOf(recent, 'ga'), c0 = avgOf(prev, 'ga'), x5 = avgOf(recent, 'xg');
   if (g5 != null && g0 != null) notes.push(g5 > g0 + 0.3 ? { i: '🚀', t: `Hàng công đang thăng hoa: ${g5.toFixed(1)} bàn/trận, tăng từ ${g0.toFixed(1)}.` } : g5 < g0 - 0.3 ? { i: '📉', t: `Sức tấn công giảm: ${g5.toFixed(1)} bàn/trận so với ${g0.toFixed(1)} trước đó.` } : { i: '➡️', t: `Hiệu suất ghi bàn ổn định quanh ${g5.toFixed(1)} bàn/trận.` });
   if (c5 != null && c0 != null) notes.push(c5 < c0 - 0.3 ? { i: '🛡️', t: `Hàng thủ cải thiện: thủng lưới ${c5.toFixed(1)}/trận (trước ${c0.toFixed(1)}).` } : c5 > c0 + 0.3 ? { i: '⚠️', t: `Hàng thủ đáng lo: thủng lưới ${c5.toFixed(1)}/trận (trước ${c0.toFixed(1)}).` } : { i: '🧱', t: `Hàng thủ ổn định (${c5.toFixed(1)} bàn thua/trận).` });
-  if (g5 != null && x5 != null) notes.push(g5 - x5 > 0.5 ? { i: '🎯', t: `Ghi bàn vượt xG (${g5.toFixed(1)} vs ${x5.toFixed(1)}) — dứt điểm đang rất "nóng", có thể khó duy trì.` } : x5 - g5 > 0.5 ? { i: '🔁', t: `Tạo nhiều cơ hội hơn số bàn (xG ${x5.toFixed(1)} vs ${g5.toFixed(1)}) — bàn thắng sẽ sớm đến.` } : { i: '⚖️', t: `Bàn thắng tương xứng với chất lượng cơ hội tạo ra.` });
+  if (g5 != null && x5 != null) notes.push(g5 - x5 > 0.5 ? { i: '🎯', t: `Ghi bàn nhiều hơn kỳ vọng (${g5.toFixed(1)} so với ${x5.toFixed(1)} bàn/trận) — dứt điểm đang rất "nóng", có thể khó duy trì.` } : x5 - g5 > 0.5 ? { i: '🔁', t: `Cơ hội tạo ra đáng giá ${x5.toFixed(1)} bàn/trận nhưng chỉ ghi ${g5.toFixed(1)} — bàn thắng sẽ sớm đến.` } : { i: '⚖️', t: `Bàn thắng tương xứng với chất lượng cơ hội tạo ra.` });
   const f = form(rows.map(r => ({ ...r, isHome: r.home })), 10);
   if (f.unbeaten >= 3) notes.push({ i: '🔥', t: `Chuỗi ${f.unbeaten} trận bất bại.` });
   h += `<div class="card"><div class="h"><h2>📌 Xu hướng nổi bật</h2></div>${notes.map((x, i) => `<div class="ins" style="animation-delay:${i * 60}ms"><i>${x.i}</i><div>${esc(x.t)}</div></div>`).join('')}</div>`;
   h += `<div class="card"><div class="h"><h2>Bàn thắng & bàn thua</h2><span class="sub">${rows.length} trận</span></div>${goalBars(rows)}</div>`;
   h += `<div class="card"><div class="h"><h2>Kiểm soát bóng</h2></div>${lineChart(lab, [{ n: 'Kiểm soát %', c: 'var(--acc)', v: rows.map(r => r.poss) }], { min: 20, max: 80, suf: '%', avg: avgOf(rows, 'poss') })}</div>`;
   h += `<div class="card"><div class="h"><h2>Dứt điểm</h2></div>${lineChart(lab, [{ n: 'Cú sút', c: 'var(--acc)', v: rows.map(r => r.shots) }, { n: 'Trúng đích', c: '#38bdf8', v: rows.map(r => r.sot) }, { n: 'Đối thủ sút', c: '#94a3b8', v: rows.map(r => r.oppShots), dash: true }], { min: 0 })}</div>`;
-  h += `<div class="card"><div class="h"><h2>xG ước tính vs bàn thắng</h2></div>${lineChart(lab, [{ n: 'xG', c: '#a78bfa', v: rows.map(r => r.xg) }, { n: 'Bàn thắng', c: 'var(--acc)', v: rows.map(r => r.gf) }, { n: 'xG đối thủ', c: '#f87171', v: rows.map(r => r.xga), dash: true }], { min: 0 })}</div>`;
+  h += `<div class="card"><div class="h"><h2>Bàn thắng kỳ vọng so với thực tế</h2></div>${lineChart(lab, [{ n: 'Bàn thắng kỳ vọng', c: '#a78bfa', v: rows.map(r => r.xg) }, { n: 'Bàn thắng', c: 'var(--acc)', v: rows.map(r => r.gf) }, { n: 'Kỳ vọng của đối thủ', c: '#f87171', v: rows.map(r => r.xga), dash: true }], { min: 0 })}</div>`;
   if (rows.some(r => r.passPct != null)) h += `<div class="card"><div class="h"><h2>Độ chính xác chuyền bóng</h2></div>${lineChart(lab, [{ n: 'Chuyền chính xác %', c: '#34d399', v: rows.map(r => r.passPct) }], { suf: '%', avg: avgOf(rows, 'passPct') })}</div>`;
   const cnt = {}; rows.forEach(r => (r.scorers || []).forEach(p => p && (cnt[p] = (cnt[p] || 0) + 1)));
   const top = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 6);
   if (top.length) h += `<div class="card"><div class="h"><h2>🏆 Chân sút tiêu biểu</h2><span class="sub">${rows.length} trận gần nhất</span></div>${top.map(([p, g]) => `<div class="mk"><span>${esc(p)}</span><div class="bar"><i data-w="${g / top[0][1] * 100}"></i></div><b>${g}</b></div>`).join('')}</div>`;
-  h += `<p class="disc">xG ước tính được tính từ số cú sút trúng đích/không trúng/bị chặn và phạt đền (dữ liệu ESPN không công bố xG chính thức). Đội: ${esc(T.name)}.</p>`;
+  h += `<p class="disc">"Bàn thắng kỳ vọng" là số bàn mà các cơ hội lẽ ra mang lại, được ứng dụng ước tính từ số cú sút trúng đích, không trúng đích, bị chặn và phạt đền (ESPN không công bố chỉ số chính thức). Trục ngang là ngày thi đấu. Đội: ${esc(T.name)}.</p>`;
   return h;
 }
 
@@ -418,7 +418,7 @@ async function openSettings() {
     <div class="set"><div>${logo('https://a.espncdn.com/i/teamlogos/soccer/500/20232.png')}</div><div style="flex:1">Inter Miami</div><label class="sw"><input type="checkbox" data-t="miami" ${teams.miami !== false ? 'checked' : ''}><span></span></label></div>
     <div class="set" style="gap:8px;flex-wrap:wrap"><button class="btn ghost" id="st-test">Gửi thử thông báo</button><button class="btn ghost" id="st-check">Kiểm tra trận mới</button></div>
     <div class="mut" style="padding:8px 0">Quyền thông báo: <b>${perm}</b>${last ? ` · Kiểm tra lần cuối: ${new Date(last).toLocaleString('vi-VN')}` : ''}</div>
-    ${!standalone ? `<div class="card install">${isIOS ? `<p>📲 <b>Cài lên iPhone:</b> mở bằng Safari → nút <b>Chia sẻ</b> → <b>Thêm vào MH chính</b>. (iOS chỉ cho phép thông báo khi app đã được cài.)</p>` : `<p>📲 <b>Cài ứng dụng</b> lên màn hình chính để nhận thông báo nền và dùng như app thật.</p><button class="btn" id="st-install">Cài đặt</button>`}</div>` : '<div class="mut">✅ Đang chạy dưới dạng ứng dụng đã cài.</div>'}
+    ${!standalone ? `<div class="card install">${isIOS ? `<p>📲 <b>Cài lên iPhone:</b> mở bằng Safari → nút <b>Chia sẻ</b> → <b>Thêm vào Màn hình chính</b>. (iOS chỉ cho phép thông báo khi app đã được cài.)</p>` : `<p>📲 <b>Cài ứng dụng</b> lên màn hình chính để nhận thông báo nền và dùng như app thật.</p><button class="btn" id="st-install">Cài đặt</button>`}</div>` : '<div class="mut">✅ Đang chạy dưới dạng ứng dụng đã cài.</div>'}
     <div class="set"><div>Xoá bộ nhớ đệm<small>Tải lại toàn bộ dữ liệu</small></div><button class="btn ghost" id="st-clear">Xoá</button></div>
     <p class="disc">Dữ liệu: ESPN (công khai). Android/Chrome: app tự kiểm tra định kỳ ở chế độ nền (Periodic Background Sync) khi đã cài. iOS: kiểm tra mỗi khi mở app.</p>`;
   $('#sheet').hidden = false;
@@ -440,14 +440,14 @@ async function openSettings() {
     const d = await getData(S.team), l = d.results.at(-1), T = TEAMS[S.team];
     if (!l) return;
     let body = `${l.me.short} ${l.gf}-${l.ga} ${l.opp.short} · ${l.league}`;
-    try { const a = analyzeMatch(await loadSummary(l.id), T.id); body += `\nKiểm soát ${a.poss?.toFixed(0) ?? '-'}% · Sút ${a.a.totalShots ?? '-'} · xG~${a.xg.toFixed(1)} · Điểm ${a.rating}/10\n${a.insights[0]?.t || ''}`; } catch (e) { }
-    const n = d.upcoming[0]; if (n) body += `\n📅 Trận tới: vs ${n.opp.short} · ${fmtDate(n.date)}`;
+    try { const a = analyzeMatch(await loadSummary(l.id), T.id); body += `\nKiểm soát bóng ${a.poss?.toFixed(0) ?? '-'}% · ${a.a.totalShots ?? '-'} cú sút · Bàn thắng kỳ vọng ${a.xg.toFixed(1)} · Điểm ${a.rating}/10\n${a.insights[0]?.t || ''}`; } catch (e) { }
+    const n = d.upcoming[0]; if (n) body += `\n📅 Trận tới: gặp ${n.opp.short} (${n.isHome ? 'sân nhà' : 'sân khách'}) · ${fmtDate(n.date)}`;
     await showNote(`(Thử) Kết thúc: ${T.short} ${l.gf}-${l.ga} ${l.opp.short}`, { body, tag: 'test', data: { url: './#match/' + S.team + '/' + l.id } });
     toast('Đã gửi thông báo thử');
   };
   $('#st-check').onclick = async () => { const s = await checkAndNotify(showNote, { force: Notification.permission === 'granted' }); toast(s.length ? `Đã gửi ${s.length} thông báo` : 'Không có trận mới cần báo'); };
   $('#st-install') && ($('#st-install').onclick = async () => { if (deferredInstall) { deferredInstall.prompt(); deferredInstall = null; } else toast('Dùng menu ⋮ của trình duyệt → "Cài đặt ứng dụng"'); });
-  $('#st-clear').onclick = async () => { const ks = await caches.keys(); await Promise.all(ks.filter(k => k.startsWith('bmh-') && k !== KV_CACHE).map(k => caches.delete(k))); const c = await caches.open(KV_CACHE); for (const r of await c.keys()) if (/http%3A|sum%3A/.test(r.url)) await c.delete(r); S.data = {}; S.trends = {}; S.preds = {}; toast('Đã xoá cache'); closeSheet(); render(true); };
+  $('#st-clear').onclick = async () => { const ks = await caches.keys(); await Promise.all(ks.filter(k => k.startsWith('bmh-') && k !== KV_CACHE).map(k => caches.delete(k))); const c = await caches.open(KV_CACHE); for (const r of await c.keys()) if (/http%3A|sum2%3A/.test(r.url)) await c.delete(r); S.data = {}; S.trends = {}; S.preds = {}; toast('Đã xoá cache'); closeSheet(); render(true); };
 }
 function closeSheet() { $('#sheet').hidden = true; }
 async function registerPeriodic() {
@@ -488,3 +488,7 @@ setInterval(async () => {
   if (soon && S.tab === 'home' && document.visibilityState === 'visible' && $('#sheet').hidden) { await getData(S.team, true); render(); }
 }, 60 * 1000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkAndNotify(showNote).catch(() => { }); });
+function standingVi(s, key) {
+  const m = /^(\d+)\w*\s+in\s+(.+)$/i.exec(s || ''); if (!m) return s || '';
+  return `Hạng ${m[1]} · ${LEAGUE_VI[TEAMS[key].leagues[0]] || m[2]}`;
+}
