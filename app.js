@@ -59,6 +59,7 @@ async function getPrediction(key, m) {
   const pr = predict(fMe, fOpp, m.isHome, odds, m.isHome);
   const h2h = oppS.results.filter(x => x.opp.id === T.id).slice(-5).reverse();
   const res = { T, m, fMe, fOpp, pr, odds, h2h };
+  savePrediction(m, pr).catch(() => { });
   S.preds[ck] = res; return res;
 }
 
@@ -167,6 +168,32 @@ function pitch(scorers) {
   });
   return `<svg class="pitch" viewBox="0 0 100 64">${g}</svg><div class="legend"><span><i style="background:var(--acc)"></i>Bàn của ${esc(TEAMS[S.team].short)} (tấn công →)</span><span><i style="background:#e2e8f0"></i>Bàn đối thủ</span></div>`;
 }
+const BADGE = { exact: ['✅', '#22c55e'], outcome: ['☑️', '#f59e0b'], miss: ['❌', '#ef4444'] };
+function verdictCard(T, m, p, g) {
+  if (!p || !g) return '';
+  const [ic, col] = BADGE[g.level];
+  const src = p.source === 'saved' ? `Đã lưu trước trận lúc ${esc(new Date(p.t).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }))}`
+    : 'Trận này diễn ra trước khi có ứng dụng — dự đoán được tính lại chỉ bằng dữ liệu có trước giờ bóng lăn (phong độ trước trận và tỉ lệ nhà cái lúc đóng kèo).';
+  const res = m.result === 'W' ? 'thắng' : m.result === 'D' ? 'hòa' : 'thua';
+  return `<div class="card" style="border-color:${col}55"><div class="h"><h2>🎯 Dự đoán so với kết quả</h2><span class="chip" style="background:${col}33;color:#fff">${ic} ${esc(g.label)}</span></div>
+    <div class="tiles t2"><div class="tile"><b>${p.i} - ${p.j}</b><span>Dự đoán<br>${esc(pickTextFromSnap(T, m.opp, p))}</span></div><div class="tile"><b>${m.gf} - ${m.ga}</b><span>Kết quả thực tế<br>${esc(T.short)} ${res}</span></div></div>
+    <div class="mk"><span>Đúng kết quả thắng/hòa/thua</span><span></span><b>${g.outcomeOk ? '✅' : '❌'}</b></div>
+    <div class="mk"><span>Đúng hiệu số bàn thắng</span><span></span><b>${g.gdOk ? '✅' : '❌'}</b></div>
+    <div class="mk"><span>Đúng tổng số bàn</span><span></span><b>${g.totalOk ? '✅' : '❌'}</b></div>
+    <div class="mk"><span>Tỉ số thật nằm trong 3 tỉ số khả dĩ nhất</span><span></span><b>${g.inTop3 ? '✅' : '❌'}</b></div>
+    <div class="mk"><span>Xác suất ứng dụng đã dành cho kết quả này</span><div class="bar"><i data-w="${g.pActual * 100}"></i></div><b>${(g.pActual * 100).toFixed(0)}%</b></div>
+    <p class="disc" style="text-align:left">${src}</p></div>`;
+}
+function recordCard(T, rec) {
+  if (!rec || !rec.n) return '';
+  const pc = v => Math.round(v / rec.n * 100) + '%';
+  return `<div class="card"><div class="h"><h2>📋 Thành tích dự đoán</h2><span class="sub">${rec.n} trận gần nhất</span></div>
+    <div class="tiles"><div class="tile"><b>${pc(rec.outcome)}</b><span>Đúng kết quả<br>(${rec.outcome}/${rec.n})</span></div><div class="tile"><b>${pc(rec.exact)}</b><span>Đúng chính xác tỉ số<br>(${rec.exact}/${rec.n})</span></div><div class="tile"><b>${pc(rec.top3)}</b><span>Tỉ số thật trong 3 khả năng đầu (${rec.top3}/${rec.n})</span></div></div>
+    <div style="margin-top:8px">${rec.rows.map(({ m, p, g }) => `<div class="row" data-go="match" data-match="${m.id}">${logo(m.opp.logo)}
+      <div><div class="nm">Gặp ${esc(m.opp.short)}</div><div class="info">${esc(fmtDate(m.date, { day: '2-digit', month: '2-digit' }))} · Dự đoán ${p.i}-${p.j} · Thực tế ${m.gf}-${m.ga}${p.source === 'rebuilt' ? ' · tính lại' : ''}</div></div>
+      <div class="res" style="background:${BADGE[g.level][1]}33;font-size:12px;min-width:84px">${BADGE[g.level][0]} ${g.exact ? 'Đúng tỉ số' : g.outcomeOk ? 'Đúng kết quả' : 'Sai'}</div></div>`).join('')}</div>
+    <p class="disc">"Tính lại" = trận diễn ra trước khi có ứng dụng, dự đoán được dựng lại chỉ từ dữ liệu có trước giờ bóng lăn. Từ nay mọi dự đoán được lưu lại trước trận để đối chiếu.</p></div>`;
+}
 const skel = n => Array.from({ length: n }, () => '<div class="skel"></div>').join('');
 const errBox = e => `<div class="card empty">⚠️ ${esc(e.message || e)}<br><br><button class="btn" onclick="render(true)">Thử lại</button></div>`;
 
@@ -226,11 +253,11 @@ async function hydrateHome(tok) {
     if (tok !== renderToken) return; const el = $('#home-prob'); if (!el) return;
     el.innerHTML = probBar(p.pr.fin, p.T, next.opp) + `<div class="meta" style="font-size:14px">🔮 Dự đoán: <b>${esc(pickText(p.T, next.opp, p.pr))}</b></div><div class="meta">Bàn thắng kỳ vọng: ${esc(p.T.short)} ${p.pr.lMe.toFixed(1)} – ${p.pr.lOp.toFixed(1)} ${esc(next.opp.short)} · Chạm để xem chi tiết</div>`; animateIn(el);
   }).catch(() => { const el = $('#home-prob'); if (el) el.innerHTML = ''; }));
-  if (last) jobs.push(loadSummary(last.id).then(s => {
+  if (last) jobs.push(loadSummary(last.id).then(async s => {
     if (tok !== renderToken) return; const el = $('#home-last'); if (!el) return;
     const a = analyzeMatch(s, TEAMS[key].id);
     el.innerHTML = `<div class="tiles t4"><div class="tile"><b>${a.poss != null ? a.poss.toFixed(0) + '%' : '-'}</b><span>Kiểm soát</span></div><div class="tile"><b>${a.a.totalShots ?? '-'}</b><span>Cú sút</span></div><div class="tile"><b>${a.xg.toFixed(1)}</b><span>Bàn thắng kỳ vọng</span></div><div class="tile"><b>${a.rating}</b><span>Điểm trận</span></div></div>
-      <div class="sec-title" style="margin-top:14px">📰 Tóm tắt</div>${matchRecap(s, a).slice(0, 3).map(x => `<div class="ins"><i>${x.i}</i><div>${esc(x.t)}</div></div>`).join('')}`;
+      ${await (async () => { try { const pp = await predictionFor(S.data[key], last), g = gradePrediction(pp, last); return g ? `<div class="ins"><i>🎯</i><div>Dự đoán trước trận: <b>${esc(pickTextFromSnap(TEAMS[key], last.opp, pp))}</b> → ${BADGE[g.level][0]} ${esc(g.label)}</div></div>` : ''; } catch (e) { return ''; } })()}<div class="sec-title" style="margin-top:14px">📰 Tóm tắt</div>${matchRecap(s, a).slice(0, 3).map(x => `<div class="ins"><i>${x.i}</i><div>${esc(x.t)}</div></div>`).join('')}`;
   }).catch(() => { const el = $('#home-last'); if (el) el.innerHTML = ''; }));
   jobs.push(getData(other).then(o => {
     if (tok !== renderToken) return; const el = $('#home-other'); if (!el) return;
@@ -283,6 +310,7 @@ async function vMatch(force) {
   h += `<div class="card hero"><span class="shine"></span><div style="display:flex;justify-content:space-between"><span class="chip">${esc(m.league)}</span><span class="chip">${a.result === 'W' ? '✅ THẮNG' : a.result === 'L' ? '❌ THUA' : '➖ HÒA'}</span></div>
     <div class="vs"><div class="t">${logo(H.logo)}${esc(H.name)}</div><div class="score">${H.score ?? '-'} - ${Aw.score ?? '-'}${H.pen != null ? `<small>Luân lưu ${H.pen}-${Aw.pen}</small>` : `<small>Kết thúc</small>`}</div><div class="t">${logo(Aw.logo)}${esc(Aw.name)}</div></div>
     <div class="meta">${esc(fmtDate(m.date, { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }))} · ${esc(sum.venue || m.venue)}${sum.attendance ? ' · 👥 ' + Number(sum.attendance).toLocaleString('vi-VN') : ''}</div></div>`;
+  try { const pp = await predictionFor(d, m); h += verdictCard(T, m, pp, gradePrediction(pp, m)); } catch (e) { }
   h += `<div class="card"><div class="h"><h2>Đánh giá màn trình diễn</h2><span class="sub">${esc(T.short)}</span></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center">${gauge(a.rating, 10, 'Điểm /10')}${a.dom != null ? gauge(a.dom, 100, 'Chỉ số áp đảo', 'var(--c2)') : ''}</div>
     <div class="tiles" style="margin-top:12px"><div class="tile"><b>${a.xg.toFixed(2)}</b><span>Bàn thắng kỳ vọng<br>đối thủ: ${a.xga.toFixed(2)}</span></div>
@@ -331,6 +359,7 @@ async function vPredict(force) {
     <div class="sec-title" style="margin:4px 0">Hai nguồn đã được kết hợp (thắng / hòa / thua)</div><div class="mk"><span>Mô hình thống kê</span><span class="mut">${P(pr.model.W)} / ${P(pr.model.D)} / ${P(pr.model.L)}</span><b></b></div>
     ${pr.market ? `<div class="mk"><span>Nhà cái (${esc(odds.provider)})</span><span class="mut">${P(pr.market.W)} / ${P(pr.market.D)} / ${P(pr.market.L)}</span><b></b></div>` : '<div class="mut">Chưa có tỉ lệ nhà cái — dùng 100% mô hình.</div>'}
     </div><div class="ins" style="margin-top:6px"><i>🎙️</i><div><b>Nhận định:</b> ${esc(verdict(T, opp, pr))}</div></div></div>`;
+  try { h += recordCard(T, await predictionRecord(d, 10)); } catch (e) { }
   h += `<div class="card"><div class="h"><h2>Các tỉ số khả dĩ</h2><span class="sub">${esc(T.short)} – ${esc(opp.short)}</span></div>
     <div class="scores">${pr.scores.slice(0, 8).map(s => `<div><b>${s.s}</b><span>${(s.p * 100).toFixed(1)}%</span></div>`).join('')}</div>
     <div class="sec-title" style="margin-top:16px">Bản đồ nhiệt tỉ số</div>

@@ -412,8 +412,57 @@ async function quickPick(key, sched, m) {
     const oppS = await loadOpponentSchedule(m.opp.id, m.leagueSlug);
     let odds = null; try { odds = (await loadSummary(m.id, true)).odds; } catch (e) { }
     const pr = predict(form(off(sched.results)), form(off(oppS.results)), m.isHome, odds, m.isHome);
+    await savePrediction(m, pr);
     return `\n🔮 Dự đoán: ${pickText(T, m.opp, pr)} (${T.short} thắng ${(pr.fin.W * 100).toFixed(0)}%, hòa ${(pr.fin.D * 100).toFixed(0)}%, thua ${(pr.fin.L * 100).toFixed(0)}%)`;
   } catch (e) { return ''; }
+}
+
+/* ---------------------------- prediction track record ---------------------------- */
+function snapshot(pr) {
+  return { t: Date.now(), outcome: pr.outcome, i: pr.pick.i, j: pr.pick.j, W: pr.fin.W, D: pr.fin.D, L: pr.fin.L,
+           lMe: pr.lMe, lOp: pr.lOp, top: pr.scores.slice(0, 3).map(x => x.s) };
+}
+// Saved before kick-off (overwritten until the match starts, so the last pre-match forecast is kept)
+async function savePrediction(m, pr) {
+  if (m.state !== 'pre' || new Date(m.date) <= Date.now()) return;
+  await kvSet('pred:' + m.id, { ...snapshot(pr), source: 'saved' });
+}
+// For matches played before the app was installed: recompute using ONLY results dated before kick-off
+// plus the bookmaker's closing odds, so the forecast never "sees" the match itself.
+async function rebuildPrediction(sched, m) {
+  const before = r => r.filter(x => new Date(x.date) < new Date(m.date) && !/friendly/i.test(x.leagueSlug));
+  let oppS = { results: [] }; try { oppS = await loadOpponentSchedule(m.opp.id, m.leagueSlug); } catch (e) { }
+  let odds = null; try { odds = (await loadSummary(m.id)).odds; } catch (e) { }
+  const pr = predict(form(before(sched.results)), form(before(oppS.results)), m.isHome, odds, m.isHome);
+  return { ...snapshot(pr), source: 'rebuilt' };
+}
+async function predictionFor(sched, m) {
+  const k = 'pred:' + m.id;
+  let p = await kvGet(k);
+  if (!p && m.completed) { p = await rebuildPrediction(sched, m); await kvSet(k, p); }
+  return p;
+}
+function gradePrediction(p, m) {
+  if (!p || !m.completed || m.gf == null) return null;
+  const exact = p.i === m.gf && p.j === m.ga;
+  const outcomeOk = p.outcome === m.result;
+  const gdOk = p.i - p.j === m.gf - m.ga;
+  const totalOk = p.i + p.j === m.gf + m.ga;
+  const pActual = m.result === 'W' ? p.W : m.result === 'D' ? p.D : p.L;
+  const inTop3 = (p.top || []).includes(`${m.gf}-${m.ga}`);
+  const level = exact ? 'exact' : outcomeOk ? 'outcome' : 'miss';
+  const label = exact ? 'Đúng chính xác tỉ số' : outcomeOk ? (gdOk ? 'Đúng kết quả và hiệu số' : 'Đúng kết quả, sai tỉ số') : 'Dự đoán sai';
+  return { exact, outcomeOk, gdOk, totalOk, pActual, inTop3, level, label };
+}
+async function predictionRecord(sched, n = 10) {
+  const recent = sched.results.filter(x => !/friendly/i.test(x.leagueSlug)).slice(-n).reverse();
+  const rows = await pool(recent, 3, async m => { const p = await predictionFor(sched, m); return p ? { m, p, g: gradePrediction(p, m) } : null; });
+  const ok = rows.filter(Boolean);
+  const cnt = f => ok.filter(r => r.g && r.g[f]).length;
+  return { rows: ok, n: ok.length, outcome: cnt('outcomeOk'), exact: cnt('exact'), gd: cnt('gdOk'), top3: cnt('inTop3'), total: cnt('totalOk') };
+}
+function pickTextFromSnap(T, opp, p) {
+  return p.outcome === 'W' ? `${T.short} thắng ${p.i}-${p.j}` : p.outcome === 'L' ? `${opp.short || opp.name} thắng ${p.j}-${p.i}` : `Hòa ${p.i}-${p.j}`;
 }
 
 /* ---------------------------- formatting ---------------------------- */
@@ -448,6 +497,10 @@ async function checkAndNotify(show, { force = false } = {}) {
         const tp = rc.find(x => x.i === '🔑' || x.i === '🟥');
         if (tp) body += `\n${tp.t}`;
         else if (a.insights[0]) body += `\n${a.insights[0].t}`;
+      } catch (e) { }
+      try {
+        const p = await predictionFor(s, last), g = gradePrediction(p, last);
+        if (g) body += `\n🎯 Dự đoán trước trận: ${pickTextFromSnap(T, last.opp, p)} → ${g.exact ? '✅' : g.outcomeOk ? '☑️' : '❌'} ${g.label}`;
       } catch (e) { }
       if (next) body += `\n📅 Trận tới: gặp ${next.opp.short} (${next.isHome ? 'sân nhà' : 'sân khách'}) · ${fmtDate(next.date)}`;
       const em = last.result === 'W' ? '✅' : last.result === 'L' ? '❌' : '➖';
