@@ -353,7 +353,16 @@ function predict(fMe, fOpp, isHome, odds, meIsHomeInOdds) {
   const pick = scores.find(x => outcome === 'W' ? x.i > x.j : outcome === 'L' ? x.i < x.j : x.i === x.j);
   const agree = market ? 1 - (Math.abs(model.W - market.W) + Math.abs(model.L - market.L)) / 2 : 0.7;
   const conf = Math.round(Math.min(95, (Math.min(fMe.n, fOpp.n) / 10) * 45 + agree * 35 + Math.abs(fin.W - fin.L) * 25));
-  return { lMe, lOp, M: g.M, model, market, fin, outcome, pick, o15: g.o15, o25: g.o25, o35: g.o35, btts: g.btts, csMe: g.csMe, csOp: g.csOp, scores: scores.slice(0, 8), conf };
+  let ou = null;
+  if (odds && odds.ou != null && !isNaN(odds.ou)) {
+    const line = Number(odds.ou); let over = 0, push = 0;
+    for (let i = 0; i < g.M.length; i++) for (let j = 0; j < g.M.length; j++) { const t = i + j; if (t > line) over += g.M[i][j]; else if (t === line) push += g.M[i][j]; }
+    const under = 1 - over - push;
+    const po = mlToProb(odds.over), pu = mlToProb(odds.under);
+    const mkOver = po != null && pu != null ? po / (po + pu) : null;
+    ou = { line, pOver: over, pUnder: under, pPush: push, pick: over >= under ? 'over' : 'under', mkOver };
+  }
+  return { ou, lMe, lOp, M: g.M, model, market, fin, outcome, pick, o15: g.o15, o25: g.o25, o35: g.o35, btts: g.btts, csMe: g.csMe, csOp: g.csOp, scores: scores.slice(0, 8), conf };
 }
 
 /* One-line unified prediction text, e.g. "Barça thắng 2-1" */
@@ -413,19 +422,19 @@ async function quickPick(key, sched, m) {
     let odds = null; try { odds = (await loadSummary(m.id, true)).odds; } catch (e) { }
     const pr = predict(form(off(sched.results)), form(off(oppS.results)), m.isHome, odds, m.isHome);
     await savePrediction(m, pr);
-    return `\n🔮 Dự đoán: ${pickText(T, m.opp, pr)} (${T.short} thắng ${(pr.fin.W * 100).toFixed(0)}%, hòa ${(pr.fin.D * 100).toFixed(0)}%, thua ${(pr.fin.L * 100).toFixed(0)}%)`;
+    return `\n🔮 Dự đoán: ${pickText(T, m.opp, pr)}${pr.ou ? ` · Mốc nhà cái ${fmtLine(pr.ou.line)} bàn: ${ouWord(pr.ou.pick)} (${((pr.ou.pick === 'over' ? pr.ou.pOver : pr.ou.pUnder) * 100).toFixed(0)}%)` : ''} (${T.short} thắng ${(pr.fin.W * 100).toFixed(0)}%, hòa ${(pr.fin.D * 100).toFixed(0)}%, thua ${(pr.fin.L * 100).toFixed(0)}%)`;
   } catch (e) { return ''; }
 }
 
 /* ---------------------------- prediction track record ---------------------------- */
 function snapshot(pr) {
   return { t: Date.now(), outcome: pr.outcome, i: pr.pick.i, j: pr.pick.j, W: pr.fin.W, D: pr.fin.D, L: pr.fin.L,
-           lMe: pr.lMe, lOp: pr.lOp, top: pr.scores.slice(0, 3).map(x => x.s) };
+           lMe: pr.lMe, lOp: pr.lOp, top: pr.scores.slice(0, 3).map(x => x.s), ou: pr.ou };
 }
 // Saved before kick-off (overwritten until the match starts, so the last pre-match forecast is kept)
 async function savePrediction(m, pr) {
   if (m.state !== 'pre' || new Date(m.date) <= Date.now()) return;
-  await kvSet('pred:' + m.id, { ...snapshot(pr), source: 'saved' });
+  await kvSet('pred2:' + m.id, { ...snapshot(pr), source: 'saved' });
 }
 // For matches played before the app was installed: recompute using ONLY results dated before kick-off
 // plus the bookmaker's closing odds, so the forecast never "sees" the match itself.
@@ -437,7 +446,7 @@ async function rebuildPrediction(sched, m) {
   return { ...snapshot(pr), source: 'rebuilt' };
 }
 async function predictionFor(sched, m) {
-  const k = 'pred:' + m.id;
+  const k = 'pred2:' + m.id;
   let p = await kvGet(k);
   if (!p && m.completed) { p = await rebuildPrediction(sched, m); await kvSet(k, p); }
   return p;
@@ -450,17 +459,28 @@ function gradePrediction(p, m) {
   const totalOk = p.i + p.j === m.gf + m.ga;
   const pActual = m.result === 'W' ? p.W : m.result === 'D' ? p.D : p.L;
   const inTop3 = (p.top || []).includes(`${m.gf}-${m.ga}`);
-  const level = exact ? 'exact' : outcomeOk ? 'outcome' : 'miss';
-  const label = exact ? 'Đúng chính xác tỉ số' : outcomeOk ? (gdOk ? 'Đúng kết quả và hiệu số' : 'Đúng kết quả, sai tỉ số') : 'Dự đoán sai';
-  return { exact, outcomeOk, gdOk, totalOk, pActual, inTop3, level, label };
+  const level = outcomeOk ? 'ok' : 'miss';
+  const label = outcomeOk ? 'Đúng kết quả' : 'Sai kết quả';
+  let ou = null;
+  if (p.ou) {
+    const t = m.gf + m.ga, actual = t > p.ou.line ? 'over' : t < p.ou.line ? 'under' : 'push';
+    ou = { line: p.ou.line, pick: p.ou.pick, actual, total: t, ok: actual === 'push' ? null : actual === p.ou.pick,
+           prob: p.ou.pick === 'over' ? p.ou.pOver : p.ou.pUnder, mkOver: p.ou.mkOver };
+  }
+  return { exact, outcomeOk, gdOk, totalOk, pActual, inTop3, level, label, ou };
 }
 async function predictionRecord(sched, n = 10) {
   const recent = sched.results.filter(x => !/friendly/i.test(x.leagueSlug)).slice(-n).reverse();
   const rows = await pool(recent, 3, async m => { const p = await predictionFor(sched, m); return p ? { m, p, g: gradePrediction(p, m) } : null; });
   const ok = rows.filter(Boolean);
   const cnt = f => ok.filter(r => r.g && r.g[f]).length;
-  return { rows: ok, n: ok.length, outcome: cnt('outcomeOk'), exact: cnt('exact'), gd: cnt('gdOk'), top3: cnt('inTop3'), total: cnt('totalOk') };
+  const ouRows = ok.filter(r => r.g && r.g.ou && r.g.ou.ok != null);
+  return { rows: ok, n: ok.length, outcome: cnt('outcomeOk'), exact: cnt('exact'), gd: cnt('gdOk'), top3: cnt('inTop3'), total: cnt('totalOk'),
+           ouN: ouRows.length, ouOk: ouRows.filter(r => r.g.ou.ok).length };
 }
+const ouWord = k => k === 'over' ? 'Trên' : k === 'under' ? 'Dưới' : 'Bằng mốc (hoàn)';
+const fmtLine = v => String(v).replace('.', ',');
+function ouText(o) { return o ? `Mốc nhà cái ${fmtLine(o.line)} bàn: dự đoán ${ouWord(o.pick)}, thực tế ${o.total} bàn (${ouWord(o.actual).toLowerCase()}) → ${o.ok == null ? '➖ hoàn' : o.ok ? '✅ đúng' : '❌ sai'}` : ''; }
 function pickTextFromSnap(T, opp, p) {
   return p.outcome === 'W' ? `${T.short} thắng ${p.i}-${p.j}` : p.outcome === 'L' ? `${opp.short || opp.name} thắng ${p.j}-${p.i}` : `Hòa ${p.i}-${p.j}`;
 }
@@ -500,7 +520,8 @@ async function checkAndNotify(show, { force = false } = {}) {
       } catch (e) { }
       try {
         const p = await predictionFor(s, last), g = gradePrediction(p, last);
-        if (g) body += `\n🎯 Dự đoán trước trận: ${pickTextFromSnap(T, last.opp, p)} → ${g.exact ? '✅' : g.outcomeOk ? '☑️' : '❌'} ${g.label}`;
+        if (g) body += `\n🎯 Dự đoán trước trận: ${pickTextFromSnap(T, last.opp, p)} → ${g.outcomeOk ? '✅' : '❌'} ${g.label}`;
+        if (g && g.ou) body += `\n📏 ${ouText(g.ou)}`;
       } catch (e) { }
       if (next) body += `\n📅 Trận tới: gặp ${next.opp.short} (${next.isHome ? 'sân nhà' : 'sân khách'}) · ${fmtDate(next.date)}`;
       const em = last.result === 'W' ? '✅' : last.result === 'L' ? '❌' : '➖';

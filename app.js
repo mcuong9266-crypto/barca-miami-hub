@@ -168,7 +168,7 @@ function pitch(scorers) {
   });
   return `<svg class="pitch" viewBox="0 0 100 64">${g}</svg><div class="legend"><span><i style="background:var(--acc)"></i>Bàn của ${esc(TEAMS[S.team].short)} (tấn công →)</span><span><i style="background:#e2e8f0"></i>Bàn đối thủ</span></div>`;
 }
-const BADGE = { exact: ['✅', '#22c55e'], outcome: ['☑️', '#f59e0b'], miss: ['❌', '#ef4444'] };
+const BADGE = { ok: ['✅', '#22c55e'], miss: ['❌', '#ef4444'] };
 function verdictCard(T, m, p, g) {
   if (!p || !g) return '';
   const [ic, col] = BADGE[g.level];
@@ -176,11 +176,9 @@ function verdictCard(T, m, p, g) {
     : 'Trận này diễn ra trước khi có ứng dụng — dự đoán được tính lại chỉ bằng dữ liệu có trước giờ bóng lăn (phong độ trước trận và tỉ lệ nhà cái lúc đóng kèo).';
   const res = m.result === 'W' ? 'thắng' : m.result === 'D' ? 'hòa' : 'thua';
   return `<div class="card" style="border-color:${col}55"><div class="h"><h2>🎯 Dự đoán so với kết quả</h2><span class="chip" style="background:${col}33;color:#fff">${ic} ${esc(g.label)}</span></div>
-    <div class="tiles t2"><div class="tile"><b>${p.i} - ${p.j}</b><span>Dự đoán<br>${esc(pickTextFromSnap(T, m.opp, p))}</span></div><div class="tile"><b>${m.gf} - ${m.ga}</b><span>Kết quả thực tế<br>${esc(T.short)} ${res}</span></div></div>
-    <div class="mk"><span>Đúng kết quả thắng/hòa/thua</span><span></span><b>${g.outcomeOk ? '✅' : '❌'}</b></div>
-    <div class="mk"><span>Đúng hiệu số bàn thắng</span><span></span><b>${g.gdOk ? '✅' : '❌'}</b></div>
-    <div class="mk"><span>Đúng tổng số bàn</span><span></span><b>${g.totalOk ? '✅' : '❌'}</b></div>
-    <div class="mk"><span>Tỉ số thật nằm trong 3 tỉ số khả dĩ nhất</span><span></span><b>${g.inTop3 ? '✅' : '❌'}</b></div>
+    <div class="tiles t2"><div class="tile"><b>${p.i} - ${p.j}</b><span>Tỉ số tham khảo<br>${esc(pickTextFromSnap(T, m.opp, p))}</span></div><div class="tile"><b>${m.gf} - ${m.ga}</b><span>Kết quả thực tế<br>${esc(T.short)} ${res}</span></div></div>
+    <div class="mk"><span>Kết quả thắng/hòa/thua: dự đoán <b>${esc(p.outcome === 'W' ? T.short + ' thắng' : p.outcome === 'L' ? m.opp.short + ' thắng' : 'Hòa')}</b></span><span></span><b>${g.outcomeOk ? '✅' : '❌'}</b></div>
+    ${g.ou ? `<div class="mk"><span>Trên/dưới mốc nhà cái ${fmtLine(g.ou.line)} bàn: dự đoán <b>${ouWord(g.ou.pick)}</b> (${(g.ou.prob * 100).toFixed(0)}%), thực tế ${g.ou.total} bàn</span><span></span><b>${g.ou.ok == null ? '➖' : g.ou.ok ? '✅' : '❌'}</b></div>` : '<div class="mk"><span class="mut">Trận này không có mốc trên/dưới của nhà cái</span><span></span><b></b></div>'}
     <div class="mk"><span>Xác suất ứng dụng đã dành cho kết quả này</span><div class="bar"><i data-w="${g.pActual * 100}"></i></div><b>${(g.pActual * 100).toFixed(0)}%</b></div>
     <p class="disc" style="text-align:left">${src}</p></div>`;
 }
@@ -188,10 +186,10 @@ function recordCard(T, rec) {
   if (!rec || !rec.n) return '';
   const pc = v => Math.round(v / rec.n * 100) + '%';
   return `<div class="card"><div class="h"><h2>📋 Thành tích dự đoán</h2><span class="sub">${rec.n} trận gần nhất</span></div>
-    <div class="tiles"><div class="tile"><b>${pc(rec.outcome)}</b><span>Đúng kết quả<br>(${rec.outcome}/${rec.n})</span></div><div class="tile"><b>${pc(rec.exact)}</b><span>Đúng chính xác tỉ số<br>(${rec.exact}/${rec.n})</span></div><div class="tile"><b>${pc(rec.top3)}</b><span>Tỉ số thật trong 3 khả năng đầu (${rec.top3}/${rec.n})</span></div></div>
+    <div class="tiles t2"><div class="tile"><b>${pc(rec.outcome)}</b><span>Đúng kết quả thắng/hòa/thua<br>(${rec.outcome}/${rec.n})</span></div><div class="tile"><b>${rec.ouN ? Math.round(rec.ouOk / rec.ouN * 100) + '%' : '-'}</b><span>Đúng trên/dưới mốc nhà cái (${rec.ouOk}/${rec.ouN})</span></div></div>
     <div style="margin-top:8px">${rec.rows.map(({ m, p, g }) => `<div class="row" data-go="match" data-match="${m.id}">${logo(m.opp.logo)}
-      <div><div class="nm">Gặp ${esc(m.opp.short)}</div><div class="info">${esc(fmtDate(m.date, { day: '2-digit', month: '2-digit' }))} · Dự đoán ${p.i}-${p.j} · Thực tế ${m.gf}-${m.ga}${p.source === 'rebuilt' ? ' · tính lại' : ''}</div></div>
-      <div class="res" style="background:${BADGE[g.level][1]}33;font-size:12px;min-width:84px">${BADGE[g.level][0]} ${g.exact ? 'Đúng tỉ số' : g.outcomeOk ? 'Đúng kết quả' : 'Sai'}</div></div>`).join('')}</div>
+      <div><div class="nm">Gặp ${esc(m.opp.short)}</div><div class="info">${esc(fmtDate(m.date, { day: '2-digit', month: '2-digit' }))} · Dự đoán ${esc(p.outcome === 'W' ? 'thắng' : p.outcome === 'L' ? 'thua' : 'hòa')} · Thực tế ${m.gf}-${m.ga}${p.source === 'rebuilt' ? ' · tính lại' : ''}</div>${g.ou ? `<div class="info">Mốc ${fmtLine(g.ou.line)}: dự đoán ${ouWord(g.ou.pick)}, thực tế ${g.ou.total} bàn ${g.ou.ok == null ? '➖' : g.ou.ok ? '✅' : '❌'}</div>` : ''}</div>
+      <div class="res" style="background:${BADGE[g.level][1]}33;font-size:12px;min-width:84px">${BADGE[g.level][0]} ${g.outcomeOk ? 'Đúng' : 'Sai'} kết quả</div></div>`).join('')}</div>
     <p class="disc">"Tính lại" = trận diễn ra trước khi có ứng dụng, dự đoán được dựng lại chỉ từ dữ liệu có trước giờ bóng lăn. Từ nay mọi dự đoán được lưu lại trước trận để đối chiếu.</p></div>`;
 }
 const skel = n => Array.from({ length: n }, () => '<div class="skel"></div>').join('');
@@ -257,7 +255,7 @@ async function hydrateHome(tok) {
     if (tok !== renderToken) return; const el = $('#home-last'); if (!el) return;
     const a = analyzeMatch(s, TEAMS[key].id);
     el.innerHTML = `<div class="tiles t4"><div class="tile"><b>${a.poss != null ? a.poss.toFixed(0) + '%' : '-'}</b><span>Kiểm soát</span></div><div class="tile"><b>${a.a.totalShots ?? '-'}</b><span>Cú sút</span></div><div class="tile"><b>${a.xg.toFixed(1)}</b><span>Bàn thắng kỳ vọng</span></div><div class="tile"><b>${a.rating}</b><span>Điểm trận</span></div></div>
-      ${await (async () => { try { const pp = await predictionFor(S.data[key], last), g = gradePrediction(pp, last); return g ? `<div class="ins"><i>🎯</i><div>Dự đoán trước trận: <b>${esc(pickTextFromSnap(TEAMS[key], last.opp, pp))}</b> → ${BADGE[g.level][0]} ${esc(g.label)}</div></div>` : ''; } catch (e) { return ''; } })()}<div class="sec-title" style="margin-top:14px">📰 Tóm tắt</div>${matchRecap(s, a).slice(0, 3).map(x => `<div class="ins"><i>${x.i}</i><div>${esc(x.t)}</div></div>`).join('')}`;
+      ${await (async () => { try { const pp = await predictionFor(S.data[key], last), g = gradePrediction(pp, last); return g ? `<div class="ins"><i>🎯</i><div>Dự đoán trước trận: <b>${esc(pickTextFromSnap(TEAMS[key], last.opp, pp))}</b> → ${BADGE[g.level][0]} ${esc(g.label)}${g.ou ? `<br>📏 ${esc(ouText(g.ou))}` : ''}</div></div>` : ''; } catch (e) { return ''; } })()}<div class="sec-title" style="margin-top:14px">📰 Tóm tắt</div>${matchRecap(s, a).slice(0, 3).map(x => `<div class="ins"><i>${x.i}</i><div>${esc(x.t)}</div></div>`).join('')}`;
   }).catch(() => { const el = $('#home-last'); if (el) el.innerHTML = ''; }));
   jobs.push(getData(other).then(o => {
     if (tok !== renderToken) return; const el = $('#home-other'); if (!el) return;
@@ -367,8 +365,9 @@ async function vPredict(force) {
     ${[0, 1, 2, 3, 4, 5].map(i => `<div class="ax">${i}</div>` + [0, 1, 2, 3, 4, 5].map(j => { const v = pr.M[i][j], mx = pr.scores[0].p, k = v / mx; return `<div style="background:${i > j ? `rgba(34,197,94,${0.1 + k * 0.85})` : i === j ? `rgba(245,158,11,${0.1 + k * 0.85})` : `rgba(239,68,68,${0.1 + k * 0.85})`}">${(v * 100).toFixed(0)}</div>`; }).join('')).join('')}</div>
     <div class="legend"><span>Hàng: bàn của ${esc(T.short)} · Cột: bàn của ${esc(opp.short)} · đơn vị %</span></div></div>`;
   const mk = (l, v) => `<div class="mk"><span>${l}</span><div class="bar"><i data-w="${v * 100}"></i></div><b>${P(v)}</b></div>`;
-  h += `<div class="card"><div class="h"><h2>Thị trường bàn thắng</h2>${odds && odds.ou ? `<span class="sub">Mốc số bàn của nhà cái: ${odds.ou}</span>` : ''}</div>
-    ${mk('Trên 1.5 bàn', pr.o15)}${mk('Trên 2.5 bàn', pr.o25)}${mk('Trên 3.5 bàn', pr.o35)}${mk('Cả hai đội ghi bàn', pr.btts)}${mk(esc(T.short) + ' sạch lưới', pr.csMe)}${mk(esc(opp.short) + ' sạch lưới', pr.csOp)}</div>`;
+  h += `<div class="card"><div class="h"><h2>Thị trường bàn thắng</h2>${odds && odds.ou ? `<span class="sub">Mốc số bàn của nhà cái: ${fmtLine(odds.ou)}</span>` : ''}</div>
+    ${pr.ou ? `<div class="ins" style="border:0"><i>📏</i><div>Mốc trên/dưới của nhà cái: <b>${fmtLine(pr.ou.line)} bàn</b>. Ứng dụng dự đoán: <b>${ouWord(pr.ou.pick)} ${fmtLine(pr.ou.line)} bàn</b> (trên ${(pr.ou.pOver * 100).toFixed(0)}% · dưới ${(pr.ou.pUnder * 100).toFixed(0)}%${pr.ou.pPush > 0.005 ? ` · bằng mốc ${(pr.ou.pPush * 100).toFixed(0)}%` : ''})${pr.ou.mkOver != null ? `. Nhà cái nghiêng về ${pr.ou.mkOver >= 0.5 ? 'trên' : 'dưới'} (trên ${(pr.ou.mkOver * 100).toFixed(0)}%)` : ''}.</div></div>` : ''}
+    ${mk('Trên 1,5 bàn', pr.o15)}${mk('Trên 2,5 bàn', pr.o25)}${mk('Trên 3,5 bàn', pr.o35)}${mk('Cả hai đội ghi bàn', pr.btts)}${mk(esc(T.short) + ' sạch lưới', pr.csMe)}${mk(esc(opp.short) + ' sạch lưới', pr.csOp)}</div>`;
   const nz = (v, lo, hi) => (v - lo) / (hi - lo);
   const axes = ['Tấn công', 'Phòng ngự', 'Phong độ', 'Sân bãi', 'Ổn định'];
   const ctx = (f, home) => (home ? f.homePpg : f.awayPpg) ?? f.ppg;
